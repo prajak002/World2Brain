@@ -102,6 +102,21 @@ Realism note: these are the simulator's real-time WebGL renders at the highest s
 training data was collected at 256 px / medium quality. Valdrada also ships a Blender Cycles path-tracing exporter and a
 UE5 client (Linux x86-64, ~30 GB) for true photorealism; neither was used here.
 
+## Two videos in sync: world model vs the fly-CNS student
+
+![World model vs fly brain](docs/media/wm2cx_nyc_duel.gif)
+
+Left, the world model itself: V-JEPA 2.1 watching the NYC twin, its ViT patch-feature map (tokens projected to PCA
+colours) and where each moment sits in its latent space. Right, the distilled student: activity of the 6,935 FlyWire
+neurons, its reconstruction of the teacher's 256-number summary, and the training scene whose teacher latent is nearest
+to the student's guess (what the brain "imagines"). The 2-D latent plot shows both trajectories and how they diverge
+during the blind steps and re-converge afterwards.
+Full video: `results/video/wm2cx_nyc_duel.mp4` (`scripts/make_video_duel.py`; runs the teacher on the 768 px frames).
+
+| eyes open (step 8) | eyes closed (step 16) |
+|---|---|
+| ![](docs/media/duel_t07.jpg) | ![](docs/media/duel_t15.jpg) |
+
 ## Video: world model vs layered connectome
 `scripts/make_video.py` replays a held-out navigation episode and renders, side by side, the 360° panorama the
 teacher sees, the top-down path, the fly-eye input, teacher vs student latents, and the connectome student laid
