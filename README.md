@@ -102,3 +102,7 @@ GRU 48.6 / 45.5. The task is much harder than the synthetic arena (120 episodes,
 clutter): absolute prediction quality is low for every student, but the real wiring is best at every horizon, and here it
 also beats the GRU, which was not the case on the synthetic arena. One seed only; needs more data and seeds.
 Video: `results/video/wm2cx_nyc_explained.mp4` (`scripts/make_video_explained.py --data data/nyc_test.npz ...`).
+
+## Web pages
+- `docs/explainer.html`: plain-language five-scene explainer with results (also published at https://claude.ai/artifact/W8qroZnbBSigaW2W3CGW1P).
+- `docs/brain3d.html`: interactive 3D replay of the trained student on real FlyWire neuron positions, teacher latent vs reconstruction, scroll chapters and personal notes (https://claude.ai/artifact/4TuHXcWNksMpqvrSr9VxDL). Built by `scripts/build_brain3d_page.py` from an export of positions + activity.
