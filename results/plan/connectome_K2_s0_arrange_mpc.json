@@ -1,0 +1,1 @@
+{"run": "connectome_K2_s0", "task": "arrange", "policy": "mpc", "success": 0.0, "dist_start": 4.088334043059957, "dist_end": 4.057222546184375, "episodes": 30, "steps": 60}

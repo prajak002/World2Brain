@@ -1,0 +1,1 @@
+{"run": "connectome_K2_s0_smoke", "task": "arrange", "policy": "mpc", "success": 1.0, "dist_start": 0.6468622816453573, "dist_end": 0.6468622816453573, "episodes": 1, "steps": 3}

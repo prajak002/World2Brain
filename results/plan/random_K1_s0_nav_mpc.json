@@ -1,0 +1,1 @@
+{"run": "random_K1_s0", "task": "nav", "policy": "mpc", "success": 0.03333333333333333, "dist_start": 5.44812557486441, "dist_end": 5.350053561396262, "episodes": 30, "steps": 30}

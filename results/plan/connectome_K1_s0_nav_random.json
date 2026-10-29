@@ -1,0 +1,1 @@
+{"run": "connectome_K1_s0", "task": "nav", "policy": "random", "success": 0.06666666666666667, "dist_start": 5.44812557486441, "dist_end": 5.701879707423745, "episodes": 30, "steps": 30}
