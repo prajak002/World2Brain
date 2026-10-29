@@ -73,6 +73,35 @@ and the 6-step CEM search need rework before this experiment is informative.
 
 Full per-run numbers: `results/summary.md`; raw JSON in `results/runs`, `results/hd`, `results/plan`.
 
+## End-to-end demo (NYC digital twin, high-quality render)
+
+![End-to-end demo](docs/media/wm2cx_nyc_e2e.gif)
+
+One held-out Times Square episode, start to finish: the view the teacher sees (left, 768 px Valdrada render with
+ambient traffic and pedestrians), the trained connectome student's activity on real FlyWire soma positions (right,
+blue = visual, orange = central complex, green = mushroom body, pink = descending), the teacher's latent summary next
+to the student's reconstruction, and the match gauge. Steps 9–16 are blind: the view goes dark and the student imagines.
+Full video: `results/video/wm2cx_nyc_e2e.mp4` (`scripts/make_video_e2e.py`, from `results/hq/` frames and
+`results/brain3d.json`).
+
+| eyes open (step 8) | eyes closed (step 16) |
+|---|---|
+| ![](docs/media/e2e_t07.jpg) | ![](docs/media/e2e_t15.jpg) |
+
+What the world looks like at this quality setting (WebGL renderer, `quality=high`, photoreal pedestrians):
+
+![Times Square, Valdrada](docs/media/nyc_hero_0.jpg)
+
+| | |
+|---|---|
+| ![](docs/media/nyc_hero_1.jpg) | ![](docs/media/nyc_hero_3.jpg) |
+
+All 24 frames of the demo episode: ![episode](docs/media/nyc_episode_sheet.jpg)
+
+Realism note: these are the simulator's real-time WebGL renders at the highest setting that runs on an M1 laptop. The
+training data was collected at 256 px / medium quality. Valdrada also ships a Blender Cycles path-tracing exporter and a
+UE5 client (Linux x86-64, ~30 GB) for true photorealism; neither was used here.
+
 ## Video: world model vs layered connectome
 `scripts/make_video.py` replays a held-out navigation episode and renders, side by side, the 360° panorama the
 teacher sees, the top-down path, the fly-eye input, teacher vs student latents, and the connectome student laid
@@ -105,4 +134,5 @@ Video: `results/video/wm2cx_nyc_explained.mp4` (`scripts/make_video_explained.py
 
 ## Web pages
 - `docs/explainer.html`: plain-language five-scene explainer with results (also published at https://claude.ai/artifact/W8qroZnbBSigaW2W3CGW1P).
+- `docs/world_brain_split.html`: world view and 3D brain side by side on one shared step slider, Times Square episode at 768 px (https://claude.ai/artifact/86AKeF8BLACdNqbENmv2BB). Built by `scripts/build_split_page.py`.
 - `docs/brain3d.html`: interactive 3D replay of the trained student on real FlyWire neuron positions, teacher latent vs reconstruction, scroll chapters and personal notes (https://claude.ai/artifact/4TuHXcWNksMpqvrSr9VxDL). Built by `scripts/build_brain3d_page.py` from an export of positions + activity.
