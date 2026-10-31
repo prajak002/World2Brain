@@ -10,6 +10,7 @@ from matplotlib.patches import Rectangle
 from PIL import Image
 from wm2cx.teacher import VJEPA21Encoder
 from wm2cx.student import FlyBrain
+from wm2cx.ckpt import build_model, convert_legacy_state
 from wm2cx.data import load_split, Latents
 from wm2cx.connectome import load as load_conn
 
@@ -26,7 +27,7 @@ lat = Latents.__new__(Latents); lat.mu, lat.P, lat.scale = ck["lat"]["mu"], ck["
 te, _ = load_split(ar["test"], lat); raw = np.load(ar["test"][0]); tr = np.load(ar["train"][0]); ep = a.episode; T = te["obs"].shape[1]
 obs, act = te["obs"][ep:ep + 1].to(dev), te["act"][ep:ep + 1].to(dev); z = te["z"][ep].numpy()
 vis = torch.ones(1, T, device=dev); vis[:, b0:b1] = 0
-m = FlyBrain(conn, obs.shape[-1], ar["k"], wiring=ar["wiring"], n_brains=ar["n_brains"], seed=ar["seed"]); m.load_state_dict(ck["state"]); m.to(dev).eval()
+m = build_model(ar, conn, obs.shape[-1], ck["state"]); m.load_state_dict(convert_legacy_state(ck["state"], m)); m.to(dev).eval()
 with torch.no_grad(): zh, H = m(obs, act, vis)
 zh, H = zh[0].cpu().numpy(), H[0].cpu().numpy(); region = conn["region"]
 match = 100 * np.clip(np.sum(zh * z, -1) / (np.linalg.norm(zh, axis=-1) * np.linalg.norm(z, axis=-1) + 1e-8), 0, 1)

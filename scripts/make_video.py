@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from wm2cx.env import FlyArena
 from wm2cx.student import FlyBrain
+from wm2cx.ckpt import build_model, convert_legacy_state
 from wm2cx.data import load_split, Latents
 from wm2cx.connectome import load as load_conn
 
@@ -29,8 +30,7 @@ obs, act, z = te["obs"][ep:ep + 1].to(dev), te["act"][ep:ep + 1].to(dev), te["z"
 vis = torch.ones(1, T, device=dev); vis[:, b0:b1] = 0
 models, Hs, Zh = [], [], []
 for ck, r in zip(cks, a.runs):
-    ar = ck["args"]; m = FlyBrain(conn, obs.shape[-1], ar["k"], wiring=ar["wiring"], n_brains=ar["n_brains"], seed=ar["seed"])
-    m.load_state_dict(ck["state"]); m.to(dev).eval()
+    ar = ck["args"]; m = build_model(ar, conn, obs.shape[-1], ck["state"]); m.load_state_dict(convert_legacy_state(ck["state"], m)); m.to(dev).eval()
     with torch.no_grad(): zh, H = m(obs, act, vis)
     models.append(m); Hs.append(H[0].cpu().numpy()); Zh.append(zh[0].cpu().numpy())
 cos = [np.sum(zh * z, -1) / (np.linalg.norm(zh, axis=-1) * np.linalg.norm(z, axis=-1) + 1e-8) for zh in Zh]

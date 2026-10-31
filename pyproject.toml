@@ -31,3 +31,8 @@ build-backend = "uv_build"
 
 [tool.uv]
 package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
