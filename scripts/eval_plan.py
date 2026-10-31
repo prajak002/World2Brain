@@ -32,7 +32,7 @@ def encode_goal(env):
     zs = []
     for hd in np.linspace(-np.pi, np.pi, 8, endpoint=False):
         o = eye(env.render(pos, hd))[None].repeat(1, 1); h = model.init_state(1, dev)
-        W = model.W() if hasattr(model, "W") else None
+        W = model.edge_weights()
         for _ in range(6): h = model.step(h, o, torch.zeros(1, dtype=torch.long, device=dev), torch.ones(1, device=dev), W)
         zs.append(model.W_out(h)[0])
     if saved is not None: env.box = saved
@@ -59,7 +59,7 @@ succ, dist0, dist1 = [], [], []
 for ep in range(a.episodes):
     env = FlyArena(task=a.task, res=256, n_boxes=1, seed=10_000 + ep); img = env.reset(); dist0.append(env.goal_distance())
     with torch.no_grad():
-        zg = encode_goal(env); W = model.W() if hasattr(model, "W") else None
+        zg = encode_goal(env); W = model.edge_weights()
         h = model.init_state(1, dev); s = 0
         prev = torch.zeros(1, dtype=torch.long, device=dev)
         for t in range(a.steps):
