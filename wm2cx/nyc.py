@@ -13,9 +13,17 @@ FT = 0.3048
 
 
 class NYCArena:
+    APPEARANCE = dict(sun_az=230.0, fog_m=420.0, sky=(95, 140, 215), light=1.0)   # appearance-shift knobs (#10)
+    SHIFTS = {"clear": {}, "overcast": dict(fog_m=250.0, sky=(150, 155, 165), light=0.8),
+              "fog": dict(fog_m=120.0, sky=(185, 190, 200), light=0.85), "dusk": dict(sun_az=300.0, sky=(200, 120, 90), light=0.6),
+              "night": dict(sky=(20, 25, 45), light=0.3, fog_m=300.0)}
+
     def __init__(self, buildings="data/nyc/midtown_buildings.json", streets="data/nyc/midtown_streets.json",
-                 res=256, seed=0, radius=160.0, episode_goal_dist=(40.0, 90.0)):
+                 res=256, seed=0, radius=160.0, episode_goal_dist=(40.0, 90.0), appearance="clear"):
+        """appearance: a key of NYCArena.SHIFTS or a dict overriding APPEARANCE (sun azimuth deg, fog distance m, sky RGB, light gain)."""
         self.res = res; self.rng = np.random.default_rng(seed); self.radius = radius; self.gd = episode_goal_dist
+        self.app = dict(self.APPEARANCE, **(self.SHIFTS[appearance] if isinstance(appearance, str) else appearance))
+        self.collisions = 0
         B = json.load(open(buildings)); S = json.load(open(streets))
         lat0 = np.mean([float(c[1]) for b in B for c in b["the_geom"]["coordinates"][0][0]]); lon0 = np.mean([float(c[0]) for b in B for c in b["the_geom"]["coordinates"][0][0]])
         self.lat0, self.lon0 = lat0, lon0
@@ -99,21 +107,35 @@ class NYCArena:
         cand = np.where((dd > self.gd[0]) & (dd < self.gd[1]))[0]
         cand = [i for i in cand if self.walkable(self.street_pts[i])]
         if not cand: return self.reset()
-        self.goal = self.street_pts[self.rng.choice(cand)]; self.t = 0
+        self.goal = self.street_pts[self.rng.choice(cand)]; self.t = 0; self.collisions = 0; self.path_len = 0.0
         if hasattr(self, "_dist"): del self._dist
         return self.render()
 
-    def step(self, a):
+    def state(self): return dict(pos=self.pos.copy(), heading=float(self.heading), t=self.t, collisions=self.collisions, path_len=self.path_len)
+    def set_state(self, s): self.pos, self.heading, self.t, self.collisions, self.path_len = s["pos"].copy(), float(s["heading"]), s["t"], s["collisions"], s["path_len"]
+
+    def step(self, a, render=True):
+        """Blocked moves (into a building) count as collisions; path_len accumulates for SPL (#10)."""
         d, dth = {0: (0, 0), 1: (3.0, 0), 2: (0, np.pi / 8), 3: (0, -np.pi / 8), 4: (-2.0, 0)}[int(a)]
         self.heading = (self.heading + dth + np.pi) % (2 * np.pi) - np.pi
         if d:
             new = self.pos + d * np.array([np.cos(self.heading), np.sin(self.heading)])
-            if self.walkable(new): self.pos = new
+            if self.walkable(new): self.path_len += abs(d); self.pos = new
+            else: self.collisions += 1
         self.t += 1
-        return self.render(), self.success()
+        return (self.render() if render else None), self.success()
 
     def success(self): return float(np.linalg.norm(self.pos - self.goal) < 12.0)
     def goal_distance(self): return float(np.linalg.norm(self.pos - self.goal))
+
+    def obstacle_ahead(self, d=3.0):
+        return not self.walkable(self.pos + d * np.array([np.cos(self.heading), np.sin(self.heading)]))
+
+    def shortest_path_length(self, start=None):
+        """Grid shortest-path length (m) from start to the goal, for SPL = success * shortest / max(shortest, travelled)."""
+        start = self.pos if start is None else start; self.bfs_next(start, self.goal)
+        r, c = self._grid(start); d = self._dist[r, c]
+        return float(d * self.cell) if d >= 0 else float(np.linalg.norm(start - self.goal))
 
     def policy(self, rng, eps=0.2):
         if rng.random() < eps: return int(rng.integers(1, 4))
@@ -143,13 +165,15 @@ class NYCArena:
         R = self.res; horizon = R // 2; f = R / (2 * np.pi)
         img = np.zeros((R, R, 3), np.float32)
         # sky with sun glow; ground: asphalt + sidewalk band
-        sky = np.linspace([95, 140, 215], [200, 220, 240], horizon)[:, None, :]
+        ap = self.app; sky0 = np.array(ap["sky"], float); sky1 = np.clip(sky0 * 0.5 + np.array([200, 220, 240]) * 0.5 * ap["light"], 0, 255)
+        sky = np.linspace(sky0, sky1, horizon)[:, None, :]
         img[:horizon] = sky
         rows = np.arange(horizon, R); ground_t = f * self.cam_h / np.maximum(rows - horizon, 1)
-        img[horizon:] = np.linspace([60, 60, 62], [45, 45, 47], R - horizon)[:, None, :]
+        img[horizon:] = np.linspace([60, 60, 62], [45, 45, 47], R - horizon)[:, None, :] * ap["light"]
         tmin, hit, pid, along, nrm, D = self._cast(pos, heading)
-        sun = np.array([np.cos(np.radians(230)), np.sin(np.radians(230))])
-        fog = lambda d: np.clip(d / 420.0, 0, 0.85)[:, None] if np.ndim(d) else np.clip(d / 420.0, 0, 0.85)
+        sun = np.array([np.cos(np.radians(ap["sun_az"])), np.sin(np.radians(ap["sun_az"]))])
+        fog_col = sky1; fog_m = ap["fog_m"]
+        fog = lambda d: np.clip(d / fog_m, 0, 0.9)[:, None] if np.ndim(d) else np.clip(d / fog_m, 0, 0.9)
         for c in range(R):
             if not hit[c]: continue
             d = tmin[c]; i = pid[c]; h = self.heights[i]; yr = self.years[i]
@@ -163,15 +187,15 @@ class NYCArena:
             zworld = (horizon - ys) * d / f + self.cam_h  # metres above ground per pixel row
             floor_u = (zworld % 3.6) / 3.6; win_u = (along[c] % 4.0) / 4.0
             win = ((floor_u > 0.25) & (floor_u < 0.8) & (win_u > 0.15) & (win_u < 0.85))
-            col = np.tile(base * shade, (len(ys), 1))
+            col = np.tile(base * shade * ap["light"], (len(ys), 1))
             if glass: col[win] = col[win] * 0.6 + np.array([40, 60, 90]) * 0.4 + 30 * np.sin(zworld[win] / 7.0)[:, None]
             else: col[win] = col[win] * 0.35
             col[(zworld % 3.6) < 0.25] *= 0.85  # floor slabs
-            col = col * (1 - fog(d)) + np.array([190, 200, 215]) * fog(d)
+            col = col * (1 - fog(d)) + fog_col * fog(d)
             img[ys, c] = col
             # sidewalk band at the building foot
             sb = np.arange(horizon, min(horizon + bot, R)); sw = (ground_t[: len(sb)] > d * 0.75) if len(sb) else np.zeros(0, bool)
-            img[sb[sw], c] = np.array([150, 148, 140]) * (1 - fog(d)) + np.array([190, 200, 215]) * fog(d)
+            img[sb[sw], c] = np.array([150, 148, 140]) * (1 - fog(d)) + fog_col * fog(d)
         # road markings: dashed centre lines where the ray hits a street segment are omitted for cost; add lane texture
         return np.clip(img, 0, 255).astype(np.uint8)
 
