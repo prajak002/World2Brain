@@ -1,6 +1,6 @@
 import argparse, json, time, numpy as np, torch, os
 from wm2cx.student import FlyBrain, GRUBaseline
-from wm2cx.data import load_split, blackout
+from wm2cx.data import load_split, blackout, parse_windows, window_errors
 from wm2cx.connectome import load as load_conn
 
 p = argparse.ArgumentParser()
@@ -11,33 +11,46 @@ p.add_argument("--k", type=int, default=256); p.add_argument("--gru_hidden", typ
 p.add_argument("--train", nargs="+", default=["data/nav_train.npz", "data/arrange_train.npz"])
 p.add_argument("--test", nargs="+", default=["data/nav_test.npz", "data/arrange_test.npz"])
 p.add_argument("--conn", default="data/connectome.npz"); p.add_argument("--tag", default="")
+p.add_argument("--eval_windows", nargs="+", default=["8:16", "14:22"], help="blind windows t0:t1 evaluated on test; the first is primary (#8)")
+p.add_argument("--lambda_act", type=float, default=0.0, help="weight of the optional policy-imitation loss (predict the next action from h); 0 = prediction-only (#12)")
 a = p.parse_args()
 torch.manual_seed(a.seed); rng = np.random.default_rng(a.seed); dev = a.device
-tr, lat = load_split(a.train, k=a.k); te, _ = load_split(a.test, lat)
-print(f"train eps {len(tr['obs'])} test eps {len(te['obs'])} PCA{a.k} explained {lat.explained:.3f}")
+tr, lat = load_split(a.train, k=a.k); te, _ = load_split(a.test, lat, keep_raw=True)
+E, T = tr["obs"].shape[:2]; windows = parse_windows(a.eval_windows, T)
+print(f"train eps {E} test eps {len(te['obs'])} PCA{a.k} explained {lat.explained:.3f}")
 conn = load_conn(a.conn)
 if a.wiring == "gru":
     model = GRUBaseline(tr["obs"].shape[-1], a.k, a.gru_hidden)
 else:
     model = FlyBrain(conn, tr["obs"].shape[-1], a.k, wiring=a.wiring, n_brains=a.n_brains, seed=a.seed)
 model.to(dev); print("neurons", model.N, "params", model.n_params())
-opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
+act_head = torch.nn.Linear(model.N, model.act_dim).to(dev) if a.lambda_act > 0 else None
+params = list(model.parameters()) + (list(act_head.parameters()) if act_head is not None else [])
+opt = torch.optim.AdamW(params, lr=a.lr, weight_decay=1e-4)
 sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, a.epochs)
-E, T = tr["obs"].shape[:2]
+
 
 def run_eval(d):
-    """Blind-horizon prediction error: 8 visible steps then H blind steps; cosine sim + MSE per horizon."""
-    model.eval(); errs = []; cos = []
+    """Blind-window prediction error on test episodes, for every window in --eval_windows.
+    Returns {"t0:t1": {mse: [H], cos: [H], mse_teacher: [H], per_ep_mse: [E,H]}} (mse in whitened PCA space,
+    mse_teacher in the original teacher space). Per-episode errors are kept for paired bootstrap CIs (#8)."""
+    model.eval(); acc = {f"{t0}:{t1}": dict(mse=[], cos=[], mse_teacher=[]) for t0, t1 in windows}
     with torch.no_grad():
-        for i in range(0, len(d["obs"]), 64):
-            obs, act, z = d["obs"][i:i + 64].to(dev), d["act"][i:i + 64].to(dev), d["z"][i:i + 64].to(dev)
-            vis = torch.ones(obs.shape[:2], device=dev); vis[:, 8:8 + a.H] = 0
-            zh, _ = model(obs, act, vis)
-            errs.append(((zh - z) ** 2).mean(-1)[:, 8:8 + a.H].cpu()); cos.append(torch.nn.functional.cosine_similarity(zh, z, -1)[:, 8:8 + a.H].cpu())
-    model.train(); errs = torch.cat(errs).mean(0); cos = torch.cat(cos).mean(0)
-    return errs.tolist(), cos.tolist()
+        for t0, t1 in windows:
+            for i in range(0, len(d["obs"]), 64):
+                obs, act, z = d["obs"][i:i + 64].to(dev), d["act"][i:i + 64].to(dev), d["z"][i:i + 64].to(dev)
+                vis = torch.ones(obs.shape[:2], device=dev); vis[:, t0:t1] = 0
+                zh, _ = model(obs, act, vis)
+                e = window_errors(zh, z, t0, t1, lat, d["z_raw"][i:i + 64].to(dev))
+                for k_, v in e.items(): acc[f"{t0}:{t1}"][k_].append(v.cpu())
+    model.train(); out = {}
+    for w, v in acc.items():
+        mse = torch.cat(v["mse"]); out[w] = dict(mse=mse.mean(0).tolist(), cos=torch.cat(v["cos"]).mean(0).tolist(),
+                                                mse_teacher=torch.cat(v["mse_teacher"]).mean(0).tolist(), per_ep_mse=mse.numpy().round(5).tolist())
+    return out
 
-t0 = time.time(); log = []
+
+t0 = time.time(); log = []; W0 = f"{windows[0][0]}:{windows[0][1]}"
 for ep in range(a.epochs):
     perm = torch.randperm(E); tot = 0; n = 0
     for i in range(0, E, a.bs):
@@ -47,17 +60,24 @@ for ep in range(a.epochs):
         zh, Hs = model(obs, act, vis)
         w = 1.0 + 2.0 * (1 - vis)  # emphasise blind (imagination) steps
         loss = (((zh - z) ** 2).mean(-1) * w).mean() + 1e-4 * (Hs ** 2).mean()
-        opt.zero_grad(); loss.backward(); torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0); opt.step()
+        if act_head is not None:   # policy imitation: h_t -> action taken after step t (act[:, t])
+            loss = loss + a.lambda_act * torch.nn.functional.cross_entropy(act_head(Hs).flatten(0, 1), act.flatten())
+        opt.zero_grad(); loss.backward(); torch.nn.utils.clip_grad_norm_(params, 1.0); opt.step()
         tot += loss.item(); n += 1
     sched.step()
     if ep % 5 == 4 or ep == a.epochs - 1:
-        mse, cs = run_eval(te)
-        print(f"ep {ep} loss {tot/n:.4f} test blind-MSE h1 {mse[0]:.4f} h4 {mse[3]:.4f} h8 {mse[-1]:.4f} cos h1 {cs[0]:.3f} h8 {cs[-1]:.3f} {time.time()-t0:.0f}s", flush=True)
+        ev = run_eval(te); mse, cs = ev[W0]["mse"], ev[W0]["cos"]
+        print(f"ep {ep} loss {tot/n:.4f} test blind-MSE h1 {mse[0]:.4f} h4 {mse[3]:.4f} h8 {mse[-1]:.4f} cos h1 {cs[0]:.3f} h8 {cs[-1]:.3f} "
+              f"teacher-space {np.mean(ev[W0]['mse_teacher']):.4f} {time.time()-t0:.0f}s", flush=True)
         log.append(dict(ep=ep, loss=tot / n, mse=mse, cos=cs))
-mse, cs = run_eval(te)
+ev = run_eval(te)
 name = f"{a.wiring}_K{a.n_brains}_s{a.seed}{a.tag}"
 os.makedirs("results/runs", exist_ok=True)
-json.dump(dict(args=vars(a), neurons=model.N, params=model.n_params(), test_mse=mse, test_cos=cs, log=log, pca_explained=lat.explained),
+json.dump(dict(args=vars(a), neurons=model.N, params=model.n_params(), test_mse=ev[W0]["mse"], test_cos=ev[W0]["cos"],
+               test_mse_teacher=ev[W0]["mse_teacher"], test_mse_per_ep=ev[W0]["per_ep_mse"], test_windows=ev,
+               n_test_episodes=len(te["obs"]), log=log, pca_explained=lat.explained),
           open(f"results/runs/{name}.json", "w"), indent=1)
-torch.save(dict(state=model.state_dict(), lat=dict(mu=lat.mu, P=lat.P, scale=lat.scale), args=vars(a)), f"results/runs/{name}.pt")
+state = dict(state=model.state_dict(), lat=dict(mu=lat.mu, P=lat.P, scale=lat.scale), args=vars(a))
+if act_head is not None: state["act_head"] = act_head.state_dict()
+torch.save(state, f"results/runs/{name}.pt")
 print("saved", name)
