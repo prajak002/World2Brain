@@ -11,9 +11,11 @@ p.add_argument("--n_boxes", type=int, default=1); p.add_argument("--seed", type=
 p.add_argument("--out", default=None); p.add_argument("--device", default="mps")
 p.add_argument("--env", default="arena", choices=["arena", "valdrada"]); p.add_argument("--save_frames", type=int, default=0, help="also store frames downsampled to this size")
 p.add_argument("--lat", type=float, default=40.7580); p.add_argument("--lon", type=float, default=-73.9855)
+p.add_argument("--causal", type=int, default=1, help="1: target at step t = latent of the clip ENDING at t (frames t-7..t, first frame repeated before the start); "
+                                                     "0: legacy non-overlapping clips whose targets encode future frames (issue #5)")
 a = p.parse_args()
 ew, eh = map(int, a.eye.split("x"))
-out = a.out or f"data/{a.task}_s{a.seed}.npz"
+out = a.out or f"data/{a.task}_s{a.seed}{'' if a.causal else '_noncausal'}.npz"
 teacher = VJEPA21Encoder("vitb", crop=a.res, frames=2 * a.clip).to(a.device)
 rng = np.random.default_rng(a.seed)
 OBS, ACT, POS, HD, BOX, GOAL, Z, SUCC, FR = [], [], [], [], [], [], [], [], []
@@ -46,8 +48,13 @@ for ep in range(a.episodes):
         frames.append(img); obs.append(eye(img)); act.append(ac); pos.append(env.pos.copy()); hd.append(env.heading); box.append(bx()); succ.append(s)
     act.append(0)
     fr = np.stack(frames)  # [T,R,R,3]
-    clips = fr.reshape(a.steps // a.clip, a.clip, a.res, a.res, 3).repeat(2, axis=1)  # duplicate frames -> 1 tubelet = 1 env step
-    z = teacher.per_step_latents(torch.from_numpy(clips).to(a.device)).cpu().numpy().reshape(a.steps, -1).astype(np.float16)
+    if a.causal:  # sliding window: clip for step t ends at t, so the target never sees frames after t
+        padded = np.concatenate([np.repeat(fr[:1], a.clip - 1, 0), fr]); idx = np.arange(a.steps)[:, None] + np.arange(a.clip)[None]
+        clips = padded[idx].repeat(2, axis=1)  # [T, 2*clip, R, R, 3]
+        z = np.concatenate([teacher.per_step_latents(torch.from_numpy(clips[i:i + 8]).to(a.device))[:, -1].cpu().numpy() for i in range(0, a.steps, 8)]).astype(np.float16)
+    else:
+        clips = fr.reshape(a.steps // a.clip, a.clip, a.res, a.res, 3).repeat(2, axis=1)  # duplicate frames -> 1 tubelet = 1 env step
+        z = teacher.per_step_latents(torch.from_numpy(clips).to(a.device)).cpu().numpy().reshape(a.steps, -1).astype(np.float16)
     OBS.append(np.stack(obs)); ACT.append(np.array(act, np.int8)); POS.append(np.stack(pos)); HD.append(np.array(hd)); BOX.append(np.stack(box))
     GOAL.append(env.goal if venv is not None else (env.lm[env.goal] if a.task == "nav" else env.zone[0])); Z.append(z); SUCC.append(np.array(succ, np.int8))
     if a.save_frames:
