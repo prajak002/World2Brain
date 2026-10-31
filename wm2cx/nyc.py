@@ -24,7 +24,7 @@ class NYCArena:
         self.res = res; self.rng = np.random.default_rng(seed); self.radius = radius; self.gd = episode_goal_dist
         self.app = dict(self.APPEARANCE, **(self.SHIFTS[appearance] if isinstance(appearance, str) else appearance))
         self.collisions = 0
-        B = json.load(open(buildings)); S = json.load(open(streets))
+        B = json.load(open(buildings, encoding="utf-8")); S = json.load(open(streets, encoding="utf-8"))
         lat0 = np.mean([float(c[1]) for b in B for c in b["the_geom"]["coordinates"][0][0]]); lon0 = np.mean([float(c[0]) for b in B for c in b["the_geom"]["coordinates"][0][0]])
         self.lat0, self.lon0 = lat0, lon0
         self.m_per_deg = (111320.0 * np.cos(np.radians(lat0)), 110540.0)
@@ -74,14 +74,21 @@ class NYCArena:
         r, c = self._grid(p); return 0 <= r < self.walk.shape[0] and 0 <= c < self.walk.shape[1] and self.walk[r, c]
 
     def bfs_next(self, start, goal):
-        """BFS on the walkability grid from goal; returns next waypoint direction from start."""
+        """Shortest-path field on the walkability grid from the goal (8-connected Dijkstra, diagonal cost sqrt 2, in cells);
+        returns the next waypoint direction from start. 4-connected BFS overestimated diagonal routes by up to 41 %,
+        which clipped SPL to 1 whenever the agent walked a straight diagonal street (#10)."""
         if not hasattr(self, "_dist") or self._dist_goal != tuple(goal):
-            H, W = self.walk.shape; dist = np.full((H, W), -1, np.int32); gr, gc = self._grid(goal); dist[gr, gc] = 0; q = deque([(gr, gc)])
+            import heapq
+            H, W = self.walk.shape; dist = np.full((H, W), -1.0, np.float32); gr, gc = self._grid(goal); dist[gr, gc] = 0.0; q = [(0.0, gr, gc)]
+            walk = self.walk; SQ2 = 2 ** 0.5
             while q:
-                r, c = q.popleft()
-                for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                d, r, c = heapq.heappop(q)
+                if d > dist[r, c]: continue
+                for dr, dc, w in ((1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0), (1, 1, SQ2), (1, -1, SQ2), (-1, 1, SQ2), (-1, -1, SQ2)):
                     rr, cc = r + dr, c + dc
-                    if 0 <= rr < H and 0 <= cc < W and self.walk[rr, cc] and dist[rr, cc] < 0: dist[rr, cc] = dist[r, c] + 1; q.append((rr, cc))
+                    if 0 <= rr < H and 0 <= cc < W and walk[rr, cc] and (w == 1.0 or (walk[r, cc] and walk[rr, c])):   # no corner cutting through walls
+                        nd = d + w
+                        if dist[rr, cc] < 0 or nd < dist[rr, cc]: dist[rr, cc] = nd; heapq.heappush(q, (nd, rr, cc))
             self._dist, self._dist_goal = dist, tuple(goal)
         r, c = self._grid(start); best, bd = None, self._dist[r, c] if self._dist[r, c] >= 0 else 1e9
         for dr in (-2, -1, 0, 1, 2):

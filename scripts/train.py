@@ -13,9 +13,15 @@ p.add_argument("--test", nargs="+", default=["data/nav_test.npz", "data/arrange_
 p.add_argument("--conn", default="data/connectome.npz"); p.add_argument("--tag", default="")
 p.add_argument("--eval_windows", nargs="+", default=["8:16", "14:22"], help="blind windows t0:t1 evaluated on test; the first is primary (#8)")
 p.add_argument("--lambda_act", type=float, default=0.0, help="weight of the optional policy-imitation loss (predict the next action from h); 0 = prediction-only (#12)")
+p.add_argument("--n_train", type=int, default=0, help="data-efficiency axis: train on a random subset of this many episodes (seeded, stratified over the train files); 0 = all. PCA stays fit on the full train set so targets are comparable across n_train.")
 a = p.parse_args()
 torch.manual_seed(a.seed); rng = np.random.default_rng(a.seed); dev = a.device
 tr, lat = load_split(a.train, k=a.k); te, _ = load_split(a.test, lat, keep_raw=True)
+if a.n_train and a.n_train < len(tr["obs"]):
+    task = tr["task"].numpy(); keep = []
+    for i in np.unique(task):                                                        # same fraction from every train file (NAV / ARRANGE)
+        idx = np.where(task == i)[0]; n_i = max(1, int(round(a.n_train * len(idx) / len(task)))); keep.append(rng.choice(idx, n_i, replace=False))
+    keep = torch.from_numpy(np.sort(np.concatenate(keep))); tr = {k: v[keep] for k, v in tr.items()}
 E, T = tr["obs"].shape[:2]; windows = parse_windows(a.eval_windows, T)
 print(f"train eps {E} test eps {len(te['obs'])} PCA{a.k} explained {lat.explained:.3f}")
 conn = load_conn(a.conn)
@@ -75,7 +81,7 @@ name = f"{a.wiring}_K{a.n_brains}_s{a.seed}{a.tag}"
 os.makedirs("results/runs", exist_ok=True)
 json.dump(dict(args=vars(a), neurons=model.N, params=model.n_params(), test_mse=ev[W0]["mse"], test_cos=ev[W0]["cos"],
                test_mse_teacher=ev[W0]["mse_teacher"], test_mse_per_ep=ev[W0]["per_ep_mse"], test_windows=ev,
-               n_test_episodes=len(te["obs"]), log=log, pca_explained=lat.explained),
+               n_test_episodes=len(te["obs"]), n_train_episodes=int(E), log=log, pca_explained=lat.explained),
           open(f"results/runs/{name}.json", "w"), indent=1)
 state = dict(state=model.state_dict(), lat=dict(mu=lat.mu, P=lat.P, scale=lat.scale), args=vars(a))
 if act_head is not None: state["act_head"] = act_head.state_dict()

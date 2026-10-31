@@ -78,21 +78,27 @@ MSE in whitened PCA-256 space (students are trained in it) and in the original t
 
 ## E2 Teacher-free planning (success rate, mean goal distance start -> end)
 
-| run | task | policy | dynamics | success | dist start | dist end | episodes |
-|---|---|---|---|---|---|---|---|
-| connectome_K1_s0 | arrange | mpc | student | 0.00 | 4.09 | 4.11 | 30 |
-| connectome_K1_s0 | arrange | random | student | 0.00 | 4.09 | 4.14 | 30 |
-| connectome_K1_s0 | arrange | scripted | student | 0.93 | 4.09 | 0.98 | 30 |
-| connectome_K1_s0 | nav | mpc | student | 0.03 | 5.45 | 6.05 | 30 |
-| connectome_K1_s0 | nav | random | student | 0.07 | 5.45 | 5.70 | 30 |
-| connectome_K1_s0 | nav | scripted | student | 1.00 | 5.45 | 0.92 | 30 |
-| connectome_K2_s0 | arrange | mpc | student | 0.00 | 4.09 | 4.06 | 30 |
-| connectome_K2_s0 | nav | mpc | student | 0.07 | 5.45 | 6.00 | 30 |
-| dense_K1_s0 | arrange | mpc | student | 0.00 | 4.09 | 4.09 | 30 |
-| dense_K1_s0 | nav | mpc | student | 0.03 | 5.45 | 6.11 | 30 |
-| gru_K1_s0 | arrange | mpc | student | 0.00 | 4.09 | 4.09 | 30 |
-| gru_K1_s0 | nav | mpc | student | 0.03 | 5.45 | 5.63 | 30 |
-| random_K1_s0 | arrange | mpc | student | 0.00 | 4.09 | 4.05 | 30 |
-| random_K1_s0 | nav | mpc | student | 0.03 | 5.45 | 5.35 | 30 |
-| shuffled_K1_s0 | arrange | mpc | student | 0.00 | 4.09 | 4.17 | 30 |
-| shuffled_K1_s0 | nav | mpc | student | 0.03 | 5.45 | 6.04 | 30 |
+| run | env | task | policy | dynamics | blackout | success | SPL | coll/100 m | dist start | dist end | episodes |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| connectome_K1_s0 | arena | arrange | mpc | student | 0 | 0.00 | - | - | 4.09 | 4.11 | 30 |
+| connectome_K1_s0 | arena | arrange | random | student | 0 | 0.00 | - | - | 4.09 | 4.14 | 30 |
+| connectome_K1_s0 | arena | arrange | scripted | student | 0 | 0.93 | - | - | 4.09 | 0.98 | 30 |
+| connectome_K1_s0 | arena | nav | mpc | student | 0 | 0.03 | - | - | 5.45 | 6.05 | 30 |
+| connectome_K1_s0 | nyc twin | nav | mpc | oracle | 1 | 1.00 | 0.98 | 0.0 | 76.41 | 10.20 | 10 |
+| connectome_K1_s0 | nyc twin | nav | mpc | oracle | 3 | 1.00 | 0.98 | 0.0 | 76.41 | 10.22 | 10 |
+| connectome_K1_s0 | nyc twin | nav | mpc | oracle | 5 | 0.80 | 0.78 | 0.0 | 76.41 | 11.17 | 10 |
+| connectome_K1_s0 | nyc twin | nav | mpc | oracle | 0 | 1.00 | 0.99 | 0.0 | 76.41 | 10.61 | 10 |
+| connectome_K1_s0 | arena | nav | random | student | 0 | 0.07 | - | - | 5.45 | 5.70 | 30 |
+| connectome_K1_s0 | arena | nav | scripted | student | 0 | 1.00 | - | - | 5.45 | 0.92 | 30 |
+| connectome_K1_s0 | nyc twin | nav | scripted | - | 3 | 0.90 | 0.89 | 3.3 | 76.41 | 17.37 | 10 |
+| connectome_K1_s0 | nyc twin | nav | scripted | - | 0 | 0.90 | 0.89 | 0.0 | 76.41 | 17.35 | 10 |
+| connectome_K2_s0 | arena | arrange | mpc | student | 0 | 0.00 | - | - | 4.09 | 4.06 | 30 |
+| connectome_K2_s0 | arena | nav | mpc | student | 0 | 0.07 | - | - | 5.45 | 6.00 | 30 |
+| dense_K1_s0 | arena | arrange | mpc | student | 0 | 0.00 | - | - | 4.09 | 4.09 | 30 |
+| dense_K1_s0 | arena | nav | mpc | student | 0 | 0.03 | - | - | 5.45 | 6.11 | 30 |
+| gru_K1_s0 | arena | arrange | mpc | student | 0 | 0.00 | - | - | 4.09 | 4.09 | 30 |
+| gru_K1_s0 | arena | nav | mpc | student | 0 | 0.03 | - | - | 5.45 | 5.63 | 30 |
+| random_K1_s0 | arena | arrange | mpc | student | 0 | 0.00 | - | - | 4.09 | 4.05 | 30 |
+| random_K1_s0 | arena | nav | mpc | student | 0 | 0.03 | - | - | 5.45 | 5.35 | 30 |
+| shuffled_K1_s0 | arena | arrange | mpc | student | 0 | 0.00 | - | - | 4.09 | 4.17 | 30 |
+| shuffled_K1_s0 | arena | nav | mpc | student | 0 | 0.03 | - | - | 5.45 | 6.04 | 30 |
