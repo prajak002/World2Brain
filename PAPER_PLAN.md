@@ -5,8 +5,11 @@
 A 300M-parameter video world model (V-JEPA 2.1) can be distilled into a recurrent network whose
 *only* recurrent wiring is the real synapse-level connectome of ~5k Drosophila neurons (FlyWire v783,
 four "brains": visual projection, central complex, mushroom-body output, descending), and the real
-wiring is a better inductive bias for action-conditioned latent prediction, teacher-free planning,
-and emergent head-direction coding than any degree-matched control.
+wiring is a better inductive bias for action-conditioned latent prediction and teacher-free planning
+than any degree-matched control. (An earlier version of this claim included "emergent EPG head-direction
+coding"; dropped after #7: the EPG population carries R² ≤ 0.2 of heading, and whole-population heading
+decodability must first beat a ridge on the cumulative action counts, which exposes relative heading
+linearly when turns are discrete and fixed-angle.)
 
 ## Thought experiment ("the fly in the dark")
 A fly's central complex keeps a heading estimate and a goal vector for seconds in darkness, using
@@ -36,8 +39,10 @@ connectome (signed)  |  connectome without signs  |  degree-preserving shuffle  
 ## Experiments
 E1 Blind-horizon latent prediction (8 visible steps, then 1..8 blind steps) on NAV and ARRANGE.
 E2 Teacher-free planning: student-only latent MPC in the live arena, success rate.
-E3 Emergent head-direction code: linear probe from EPG / CX / VIS / MB populations, visible and blind
-   (path-integration) conditions.
+E3 Head-direction decodability: linear probe from EPG / CX / VIS / MB populations, visible and blind
+   (path-integration) conditions, reported against (i) a ridge on cumulative one-hot actions alone and (ii) a
+   feature-count-matched random 1,400-neuron subset (#7). Optional: collect with `--turn_noise` so turn angles
+   are continuous and the action record no longer determines heading.
 E4 Multi-brain scaling K = 1,2,3.
 E5 Ablations: sign (Dale), region input routing, horizon.
 
