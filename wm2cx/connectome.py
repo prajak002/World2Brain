@@ -59,4 +59,11 @@ def load(path="data/connectome.npz"):
 
 
 if __name__ == "__main__":
-    print(json.dumps(build(), indent=1))
+    import argparse
+    p = argparse.ArgumentParser(description="Build the FlyWire subgraph; --min_syn / --regions for the ablations in #13.")
+    p.add_argument("--ann", default="data/raw/neuron_annotations.tsv"); p.add_argument("--conn", default="data/raw/proofread_connections_783.feather")
+    p.add_argument("--out", default="data/connectome.npz"); p.add_argument("--min_syn", type=int, default=5)
+    p.add_argument("--regions", nargs="+", default=["VIS", "CX", "MB", "OUT"], choices=list(REGION_RULES))
+    a = p.parse_args()
+    assert "VIS" in a.regions and "CX" in a.regions, "the student needs VIS (visual input) and CX (action input)"
+    print(json.dumps(build(a.ann, a.conn, a.out, a.min_syn, tuple(a.regions)), indent=1))
