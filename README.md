@@ -149,6 +149,10 @@ degree-shuffled control is shown below the real wiring. Steps 8–15 are blind: 
 Output: `results/video/wm2cx_connectome.mp4` (and `.gif`, stills at `_t07.png` / `_t15.png`).
 Explainable version for non-specialists: `scripts/make_video_explained.py` → `results/video/wm2cx_explained.mp4`
 (title card, one narrated scene per step with plain-English captions, a "match %" gauge per brain, closing findings).
+Issue-sweep explainer (#6–#13): `scripts/make_video_issues.py` → `results/video/wm2cx_issues_explained.mp4` (+ `.gif`,
+one still per scene `_s00..09.png`). One scene per issue with the numbers the repo holds (E1 curves vs trivial
+baselines, seed spread, heading-probe controls, planner ladder with oracle dynamics, NYC protocol, Table 3), narrated
+offline with Windows SAPI when available (`--no_audio` otherwise); needs only the committed JSON/PNG results, not `data/`.
 
 ## NYC digital twin (Valdrada) — run 2, 2026-10-29
 Real New York from [Valdrada](https://github.com/mkturkcan/valdrada): NYC building footprints + PLUTO attributes, street
