@@ -43,6 +43,11 @@ class FlyArena:
         return dict(pos=self.pos.copy(), heading=float(self.heading), box=self.box.copy())
 
     def step(self, a: int):
+        self.move(a)
+        return self.render(), self.success()
+
+    def move(self, a: int):
+        """advance the state without rendering (planner oracles)."""
         d, dth = ACTIONS[int(a)]
         self.heading = (self.heading + dth + np.pi) % (2 * np.pi) - np.pi
         if d != 0.0:
@@ -56,7 +61,6 @@ class FlyArena:
                     self.box[i] = np.clip(self.box[i] + mv, 1.5, self.size - 1.5)
             self.pos = new  # landmarks are visual beacons, not obstacles
         self.t += 1
-        return self.render(), self.success()
 
     def success(self):
         if self.task == "nav":
