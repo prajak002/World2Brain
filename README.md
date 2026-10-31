@@ -24,10 +24,18 @@ into the native transformers VJEPA2 encoder (see `wm2cx/teacher.py`).
 | Erdos-Renyi random | 2 | 7.25M | 0.648 ± 0.004 | 0.579 | 0.557 | 0.751 |
 | dense | 1 | 55.25M | 0.719 | 0.509 | 0.629 | 0.823 |
 | GRU (1400 hidden) | 1 | 9.50M | 0.544 | 0.663 | 0.483 | 0.655 |
+| *trivial: constant train mean* | – | 0 | 1.043 | – | | |
+| *trivial: copy last visible latent* | – | 0 | 0.97–1.19 | – | | |
 
 Reading: real wiring identity beats every degree/edge-matched sparse control and the dense net, with
 seed variance an order of magnitude below the gaps. Removing Dale's-law signs does not hurt (slightly helps).
-The parameter-matched GRU is the best predictor, especially at long horizons.
+The parameter-matched GRU is the best predictor, especially at long horizons. Every student is well below both
+trivial predictors on the arena (connectome 0.625 vs 1.04 constant mean); the trivial rows were recomputed in the
+same PCA-256 space and blind window (`scripts/eval_trivial.py`, #6). All numbers above are in whitened PCA space;
+`scripts/summarize.py` now also reports MSE in the original 3,840-d teacher space, bootstrap 95% CIs over test
+episodes and paired tests vs the connectome for every run that stores per-episode errors (`scripts/train.py`
+does since #8; the run-1 JSONs do not, so those columns read "-" until `scripts/run_seeds.sh` is rerun with
+5 seeds per condition).
 
 ### E4 Multi-brain scaling (connectome, seed 0)
 | K | neurons | params | blind MSE | cos |
@@ -140,11 +148,17 @@ Data: 120 train / 30 test episodes of 24 steps around Times Square (scripted-wal
 | degree-shuffled | 0.933 | 0.893 | 0.922 | 0.906 | 0.271 |
 | Erdos-Renyi random | 0.975 | 0.889 | 0.932 | 0.917 | 0.262 |
 | GRU (1400) | 1.024 | 0.834 | 0.946 | 0.907 | 0.280 |
+| *trivial: constant train mean* | | | | 0.977 | |
+| *trivial: copy last visible latent* | | | | 1.46–1.64 | |
 
-Heading probe (median error, deg; visible / blind): connectome 19.7 / 30.0, shuffled 24.6 / 27.3, random 27.6 / 32.7,
+**This is a pilot, not a result.** The connectome student is only 9 % better than predicting the training mean
+(0.885 vs 0.977), with one seed and 30 test episodes from a single location (Times Square), a random episode split and
+no appearance variation; copy-last is *worse* than the mean because the 110° view changes a lot per step. Heading
+probe (median error, deg; visible / blind): connectome 19.7 / 30.0, shuffled 24.6 / 27.3, random 27.6 / 32.7,
 GRU 48.6 / 45.5. The task is much harder than the synthetic arena (120 episodes, 110° view instead of 360°, real
-clutter): absolute prediction quality is low for every student, but the real wiring is best at every horizon, and here it
-also beats the GRU, which was not the case on the synthetic arena. One seed only; needs more data and seeds.
+clutter): absolute prediction quality is low for every student; the real wiring is nominally best at every horizon
+and here also beats the GRU, but none of these gaps has a confidence interval yet. Needs ≥3 seeds, ≥3 locations with
+a geographic train/val/test split, and scaled collection before any claim is made (#8, #10).
 Video: `results/video/wm2cx_nyc_explained.mp4` (`scripts/make_video_explained.py --data data/nyc_test.npz ...`).
 
 ## Web pages
