@@ -35,7 +35,8 @@ def per_ep(r):
 
 runs, base, hd, plan = load("results/runs/*.json"), load("results/baselines/*.json"), load("results/hd/*.json"), load("results/plan/*.json")
 L = ["# wm2cx results summary", ""]
-tags = sorted({tag_of(n) for n in list(runs) + list(base)}, key=lambda t: (t != "", t))
+is_eff = lambda n: re.search(r"_n(\d+)$", n)                                   # data-efficiency runs (train.py --n_train) get their own table
+tags = sorted({tag_of(n) for n in list(runs) + list(base) if not is_eff(n)}, key=lambda t: (t != "", t))
 for tag in tags:
     ds = "arena (NAV + ARRANGE)" if tag == "" else tag.strip("_").upper()
     R = {n: r for n, r in runs.items() if tag_of(n) == tag}; Bz = {n: r for n, r in base.items() if tag_of(n) == tag}
@@ -88,6 +89,17 @@ for n, r in runs.items():
     if r["args"]["wiring"] == "connectome" and r["args"]["seed"] == 0 and tag_of(n) == "":
         L.append(f"| {r['args']['n_brains']} | {r['neurons']} | {r['params']/1e6:.2f}M | {np.mean(r['test_mse']):.4f} | {np.mean(r['test_cos']):.3f} |")
 
+eff = {}
+for n, r in runs.items():
+    m = is_eff(n)
+    if m: eff.setdefault(int(m.group(1)), {}).setdefault(r["args"]["wiring"], []).append(float(np.mean(r["test_mse"])))
+if eff:
+    ws = sorted({w for d in eff.values() for w in d}, key=lambda w: (w != "connectome", w))
+    L += ["", "## E6 Data efficiency (arena; blind MSE mean over horizons, mean ± sd over seeds [n]; PCA fit on the full train set)", "",
+          "| train episodes | " + " | ".join(ws) + " |", "|---|" + "---|" * len(ws)]
+    for n_ in sorted(eff):
+        cells = [(f"{np.mean(v):.4f} ± {np.std(v, ddof=1) if len(v) > 1 else 0:.4f} [{len(v)}]" if (v := eff[n_].get(w)) else "-") for w in ws]
+        L.append(f"| {n_} | " + " | ".join(cells) + " |")
 L += ["", "## E3 Head-direction / position linear probes (median heading error, deg; R² in brackets)", "",
       "`actions only`: ridge on cumulative one-hot actions, no neural state (a leaky integrator of discrete turns exposes relative heading "
       "linearly, so this is the floor any recurrent state must beat, #7). `all@1400`: random 1,400-neuron subset, feature count matched to the GRU.", "",
@@ -97,7 +109,9 @@ for n, d in hd.items():
     L.append(f"| {n} | {g(d,'blind_actions_only')} | {g(d,'vis_all')} | {g(d,'blind_all')} | {g(d,'blind_all@1400')} | {g(d,'vis_EPG')} | {g(d,'blind_EPG')} | {g(d,'vis_CX')} | {g(d,'blind_CX')} | {d['blind_all']['pos_r2']:.2f} |")
 
 L += ["", "## E2 Teacher-free planning (success rate, mean goal distance start -> end)", "",
-      "| run | task | policy | dynamics | success | dist start | dist end | episodes |", "|---|---|---|---|---|---|---|---|"]
+      "| run | env | task | policy | dynamics | blackout | success | SPL | coll/100 m | dist start | dist end | episodes |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+fm = lambda d, k, f="{:.2f}": f.format(d[k]) if k in d else "-"
 for n, d in plan.items():
-    L.append(f"| {d['run']} | {d['task']} | {d['policy']} | {d.get('dynamics', 'student')} | {d['success']:.2f} | {d['dist_start']:.2f} | {d['dist_end']:.2f} | {d['episodes']} |")
+    env = d.get("env", "arena") + (f" ({d['appearance']})" if d.get("appearance", "clear") != "clear" else "") + (" twin" if n.endswith("_twin") else "")
+    L.append(f"| {d['run']} | {env} | {d['task']} | {d['policy']} | {d.get('dynamics', 'student')} | {d.get('blackout', 0)} | {d['success']:.2f} | {fm(d, 'spl')} | {fm(d, 'collisions_per_100m', '{:.1f}')} | {d['dist_start']:.2f} | {d['dist_end']:.2f} | {d['episodes']} |")
 open("results/summary.md", "w", encoding="utf-8").write("\n".join(L) + "\n"); print("\n".join(L).encode("ascii", "replace").decode())

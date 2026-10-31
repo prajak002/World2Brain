@@ -58,6 +58,16 @@ REGION = np.array(B3["region"]); EDGES = np.array(B3["edges"])[:2500]; ESIGN = n
 ARENA_MATCH = np.array(B3["arena"]["match"], float); NYC_MATCH = np.array(B3["nyc"]["match"], float)
 ARENA_OBS = [np.array(o, np.uint8) for o in B3["arena"]["obs"]]
 IMG_NYC = plt.imread(R("env_nyc.png")); IMG_NAV = plt.imread(R("env_nav.png"))
+# raycast NYC digital twin (scripts/render_nyc_twin.py; data from scripts/fetch_nyc_data.sh) and planner runs on it (#10)
+TWIN = np.load(R("nyc_twin", "episode.npz")) if os.path.exists(R("nyc_twin", "episode.npz")) else None
+if TWIN is not None:
+    with open(R("nyc_twin", "episode.json")) as f: TWIN_META = json.load(f)
+    TWIN_APP = {k: plt.imread(R("nyc_twin", f"appearance_{k}.png")) for k in ("clear", "overcast", "fog", "dusk", "night")}
+import glob as _glob
+TWIN_PLAN = []
+for f_ in sorted(_glob.glob(R("plan", "*_nyc_*_twin.json"))):
+    with open(f_) as f: TWIN_PLAN.append(json.load(f))
+TWIN_PLAN.sort(key=lambda r: (r["policy"] != "scripted", r.get("blackout", 0)))
 
 # ---------- helpers ----------
 fig = plt.figure(figsize=(12.8, 7.2), dpi=100)
@@ -304,6 +314,49 @@ def s_nyc(pr):
     axm.text(12.5, 88, "blind: match collapses to 0", fontsize=9.5, color=BAD, ha="center")
     caption(ax, "Pilot numbers stay labelled as a pilot (connectome 0.885 vs constant mean 0.977).\nCollection needs the Valdrada server and a GPU: scripts/collect_nyc_multi.sh, then scripts/split_geo.py.")
 
+@scene("And this is the digital twin itself, rendered live. Six hundred eighty six real Midtown building footprints with their "
+       "roof heights and construction years come from NYC Open Data, the street grid from OpenStreetMap, and the arena raycasts a "
+       "three hundred sixty degree panorama against that geometry. Facade materials follow the real build year: glass for towers "
+       "after nineteen sixty, brick and limestone for pre-war blocks. The strip shows one pose under the five appearance shifts. "
+       "On the map, the scripted controller walks toward a goal street; at step eight the lights go out for three steps and it has "
+       "to act blind. The table gives the first planner numbers on the twin: a scripted policy and the oracle planner, with "
+       "blackouts of zero to five steps, scored by success, path-length-weighted success, and collisions per hundred metres.", 30)
+def s_twin(pr):
+    ax = header("NYC digital twin, rendered live", "#10", "wm2cx/nyc.py: 686 real Midtown footprints (NYC Open Data 5zhs-2jue) + OSM streets, raycast 360° panorama")
+    if TWIN is None: caption(ax, "results/nyc_twin/ missing: run scripts/fetch_nyc_data.sh then scripts/render_nyc_twin.py"); return
+    F, BL = TWIN["frames"], TWIN["blind"]; T = len(F); t = min(T - 1, int(pr / 0.85 * T)); blind = bool(BL[t])
+    axp = fig.add_axes([0.04, 0.44, 0.50, 0.40]); axp.imshow((F[t] * (0.15 if blind else 1.0)).astype(np.uint8), aspect="auto", interpolation="nearest"); axp.set_xticks([]); axp.set_yticks([])
+    axp.set_title(("LIGHTS OFF: controller acts blind" if blind else "scripted controller, eyes open") + f"   — step {t + 1}/{T}, 360° view", fontsize=11, loc="left", color=BAD if blind else TXT2)
+    if blind: axp.text(0.5, 0.5, "LIGHTS OFF", color=BAD, fontsize=30, weight="bold", ha="center", va="center", transform=axp.transAxes)
+    for i, k in enumerate(("clear", "overcast", "fog", "dusk", "night")):
+        axa = fig.add_axes([0.04 + 0.102 * i, 0.22, 0.096, 0.17]); axa.imshow(TWIN_APP[k], aspect="auto"); axa.set_xticks([]); axa.set_yticks([]); axa.set_title(k, fontsize=10, color=TXT2, pad=3)
+        for sp in axa.spines.values(): sp.set_edgecolor(GRID)
+    # map: real footprints, streets, path
+    axm = fig.add_axes([0.58, 0.30, 0.40, 0.55]); axm.set_facecolor("#20201f"); axm.set_xticks([]); axm.set_yticks([])
+    from matplotlib.collections import PolyCollection
+    V, O, Hh = TWIN["poly_verts"], TWIN["poly_offsets"], TWIN["poly_height"]
+    polys = [V[O[i]:O[i + 1]] for i in range(len(O) - 1)]; shade = np.clip(Hh / 150.0, 0, 1)
+    axm.add_collection(PolyCollection(polys, facecolors=[(0.22 + 0.5 * s, 0.30 + 0.45 * s, 0.42 + 0.5 * s, 1.0) for s in shade], edgecolors="none"))
+    axm.add_collection(LineCollection(TWIN["street_segs"], colors="#4a4a47", linewidths=0.8))
+    P, G = TWIN["pos"], TWIN["goal"]; c0 = (P[0] + G) / 2
+    axm.plot(P[:t + 1, 0], P[:t + 1, 1], color=C["connectome"], lw=2.2)
+    bl_idx = np.where(BL[:t + 1])[0]
+    if len(bl_idx): axm.plot(P[bl_idx[0]:min(bl_idx[-1] + 2, t + 1), 0], P[bl_idx[0]:min(bl_idx[-1] + 2, t + 1), 1], color=BAD, lw=2.6)
+    axm.scatter([P[0, 0]], [P[0, 1]], s=40, color=TXT, zorder=4); axm.scatter([G[0]], [G[1]], s=90, marker="*", color=C["random"], zorder=4)
+    axm.scatter([P[t, 0]], [P[t, 1]], s=55, color=BAD if blind else C["connectome"], edgecolor=BG, lw=1.2, zorder=5)
+    axm.add_patch(plt.Circle(G, 12.0, fc="none", ec=C["random"], lw=1, ls="--"))
+    axm.set_xlim(c0[0] - 130, c0[0] + 130); axm.set_ylim(c0[1] - 90, c0[1] + 90); axm.set_aspect("equal")
+    axm.set_title("map: real footprints shaded by height, goal ★ with 12 m radius, path (red = blind)", fontsize=10, loc="left", color=TXT2)
+    axm.text(0.01, 0.02, f"shortest path {TWIN_META['shortest_path_m']:.0f} m · walked {TWIN_META['path_len_m']:.0f} m · collisions {TWIN_META['collisions']} · success {TWIN_META['success']:.0f}", transform=axm.transAxes, fontsize=9.5, color=TXT2)
+    # planner table on the twin
+    axt = fig.add_axes([0.58, 0.11, 0.40, 0.17]); axt.axis("off"); axt.set_xlim(0, 1); axt.set_ylim(0, 1); al = ease(pr * 2.5 - 1.4)
+    rows = [("planner on the twin (10 ep)", "blackout", "success", "SPL", "coll/100 m")]
+    for r in TWIN_PLAN: rows.append((("scripted policy" if r["policy"] == "scripted" else "CEM-MPC, oracle dyn."), str(r.get("blackout", 0)), f"{r['success']:.0%}", f"{r.get('spl', 0):.2f}", f"{r.get('collisions_per_100m', 0):.1f}"))
+    if len(rows) == 1: rows.append(("eval_plan.py --env nyc --dynamics oracle --blackout N", "", "", "", ""))
+    for i, r in enumerate(rows[:7]):
+        for j, (c, x) in enumerate(zip(r, (0.0, 0.50, 0.64, 0.80, 0.92))): axt.text(x, 0.98 - 0.16 * i, c, fontsize=9.5, color=TXT2 if i == 0 else TXT, alpha=al, va="top", ha="left" if j == 0 else "center")
+    caption(ax, "Reproduce: scripts/fetch_nyc_data.sh (NYC Open Data + Overpass), scripts/render_nyc_twin.py,\neval_plan.py --env nyc --policy scripted / --dynamics oracle --blackout 0 1 3 5 (no checkpoint needed)")
+
 @scene("Issues twelve and thirteen tie the text to the code. The implementation record states exactly what trains: a prediction-only "
        "loss with blind steps weighted three times, five discrete actions, the ViT-B teacher with a three thousand eight hundred forty "
        "dimensional target, and the FlyWire licence. A policy-imitation head is available as an ablation flag but was never used in a "
@@ -337,7 +390,7 @@ def s_end(pr):
     axb = fig.add_axes([0.55, 0.10, 0.45, 0.80]); brain(axb, 2.0 + 0.6 * pr, s=3); axb.set_alpha(0.6)
     axl = fig.add_axes([0.04, 0.14, 0.52, 0.72]); axl.axis("off"); axl.set_xlim(0, 1); axl.set_ylim(0, 1)
     axl.text(0, 0.99, "done and verified (synthetic data, 25 tests pass)", fontsize=12.5, weight="bold", color=GOOD, va="top")
-    bullets(axl, ["#11 edge-list recurrence, Table 3 script, 29 MB checkpoints", "#6 #8 trivial baselines, teacher-space MSE, bootstrap / paired / seed CIs", "#7 action-only and feature-matched probe controls, turn noise", "#9 oracle ladder: CEM solves NAV 10/10, student MPC is the bottleneck", "#10 geographic split, 4 locations, appearance shifts, blackout metrics", "#12 #13 implementation record, subgraph rationale, connectome CLI"], 0.0, 0.92, dy=0.075, pr=min(1, pr * 1.4), fs=11)
+    bullets(axl, ["#11 edge-list recurrence, Table 3 script, 29 MB checkpoints", "#6 #8 trivial baselines, teacher-space MSE, bootstrap / paired / seed CIs", "#7 action-only and feature-matched probe controls, turn noise", "#9 oracle ladder: CEM solves NAV 10/10, student MPC is the bottleneck", "#10 geographic split, 4 locations, appearance shifts, blackout metrics; raycast twin rendered from real NYC data", "#12 #13 implementation record, subgraph rationale, connectome CLI"], 0.0, 0.92, dy=0.075, pr=min(1, pr * 1.4), fs=11)
     axl.text(0, 0.42, "needs data/ + GPU or the M1", fontsize=12.5, weight="bold", color=C["random"], va="top", alpha=ease(pr * 2 - 1))
     bullets(axl, ["scripts/run_seeds.sh  (5 arena, 3 NYC seeds)", "scripts/ablate_connectome.sh", "scripts/collect_nyc_multi.sh  +  split_geo.py", "eval_plan.py --dynamics student / render_*  on real checkpoints", "eval_hd.py --blind  for the actions_only / all@1400 columns", "bench_latency.py --device cuda  on the real connectome"], 0.0, 0.36, dy=0.058, pr=ease(pr * 2 - 1), fs=10.5, color=TXT2)
     caption(ax, "github.com/prajak002/World2Brain  ·  results/summary.md regenerates from the JSONs  ·  this video: scripts/make_video_issues.py")

@@ -180,6 +180,10 @@ clutter): absolute prediction quality is low for every student; the real wiring 
 and here also beats the GRU, but none of these gaps has a confidence interval yet. Needs ≥3 seeds, ≥3 locations with
 a geographic train/val/test split, and scaled collection before any claim is made (#8, #10).
 
+Run 3 on a GPU box: `scripts/aws_h100.sh` (stages `seeds hd plan bench ablate`, restartable) runs everything that still
+needs compute, including the data-efficiency axis (`train.py --n_train 50|100|200|500`, connectome vs shuffled vs GRU,
+3 seeds, summarised as E6) that tests whether the connectome prior beats the GRU where a prior should matter.
+
 Benchmark protocol for run 3 (#10, tooling in place, data not yet collected):
 - `scripts/collect_nyc_multi.sh`: four locations (Times Square, Flatiron, FiDi, Upper West Side), one server restart
   per location, then `scripts/split_geo.py`, which assigns whole 120 m blocks of start positions to train / val / test
@@ -193,6 +197,28 @@ Benchmark protocol for run 3 (#10, tooling in place, data not yet collected):
 - Appearance shifts: `NYCArena(appearance=clear|overcast|fog|dusk|night)` (fog distance, sun azimuth, sky colour, light
   level) for train-on-clear / test-on-shift evaluation; `--appearance` on `eval_plan.py`.
 Video: `results/video/wm2cx_nyc_explained.mp4` (`scripts/make_video_explained.py --data data/nyc_test.npz ...`).
+
+Raycast twin without Valdrada (`wm2cx/nyc.py`, 2026-10-31): `scripts/fetch_nyc_data.sh` downloads the inputs that were
+missing from the repo (686 Midtown footprints with roof height and construction year from NYC Open Data `5zhs-2jue`,
+823 OSM street ways from Overpass, ~0.9 × 0.8 km around Times Square) into `data/nyc/`; `scripts/render_nyc_twin.py`
+renders the five appearance shifts from one pose and a scripted episode with a 3-step blackout (`results/nyc_twin/`,
+~30 ms per 256 px panorama on CPU, so collection is not GPU-bound here). The grid shortest path used by SPL is now an
+8-connected Dijkstra (4-connected BFS overestimated diagonal avenues by up to 41 % and clipped SPL to 1). Planner runs
+on the twin need no checkpoint (`eval_plan.py --env nyc --policy scripted | --dynamics oracle --blackout N
+--blackout_trigger fixed`, 10 episodes, 40 steps, goals 40–90 m, CEM horizon 8 / 64 candidates / 3 iterations):
+
+| controller on the twin | blackout (steps, from step 8) | success | SPL | collisions / 100 m |
+|---|---|---|---|---|
+| scripted (walkability-grid waypoints) | 0 | 0.90 | 0.89 | 0.0 |
+| scripted | 3 | 0.90 | 0.89 | 3.3 |
+| CEM-MPC, oracle dynamics | 0 | 1.00 | 0.99 | 0.0 |
+| CEM-MPC, oracle dynamics | 1 | 1.00 | 0.98 | 0.0 |
+| CEM-MPC, oracle dynamics | 3 | 1.00 | 0.98 | 0.0 |
+| CEM-MPC, oracle dynamics | 5 | 0.80 | 0.78 | 0.0 |
+
+Blind controllers take random actions (the scripted policy reads env state, so it is denied too), which is where the
+collisions come from; the oracle planner re-plans after the blackout and absorbs up to 3 blind steps. These are the
+search-side ceilings for E2 on the twin: the student-dynamics rows still need checkpoints trained on twin episodes.
 
 ## Web pages
 - `docs/explainer.html`: plain-language five-scene explainer with results (also published at https://claude.ai/artifact/W8qroZnbBSigaW2W3CGW1P).

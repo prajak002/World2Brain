@@ -165,7 +165,7 @@ for ep in range(a.episodes):
             if a.policy == "mpc":
                 if not visible and a.dynamics != "student": ac = int(rng.integers(1, 4))   # oracle/render planners "see"; deny them during blackout
                 else: ac = plan(env, h, zg, W)
-            elif a.policy == "random": ac = int(rng.integers(1, 4))
+            elif a.policy == "random" or not visible: ac = int(rng.integers(1, 4))   # the scripted policy reads env state, so deny it too during the blackout
             else: ac = scripted(env)
             img, s = env.step(ac); prev = torch.tensor([ac], device=dev)
             travelled += float(np.linalg.norm(env.pos - pos_prev)); pos_prev = env.pos.copy()
