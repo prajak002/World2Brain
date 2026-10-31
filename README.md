@@ -151,3 +151,36 @@ Video: `results/video/wm2cx_nyc_explained.mp4` (`scripts/make_video_explained.py
 - `docs/explainer.html`: plain-language five-scene explainer with results (also published at https://claude.ai/artifact/W8qroZnbBSigaW2W3CGW1P).
 - `docs/world_brain_split.html`: world view and 3D brain side by side on one shared step slider, Times Square episode at 768 px (https://claude.ai/artifact/86AKeF8BLACdNqbENmv2BB). Built by `scripts/build_split_page.py`.
 - `docs/brain3d.html`: interactive 3D replay of the trained student on real FlyWire neuron positions, teacher latent vs reconstruction, scroll chapters and personal notes (https://claude.ai/artifact/4TuHXcWNksMpqvrSr9VxDL). Built by `scripts/build_brain3d_page.py` from an export of positions + activity.
+
+## Issue fixes (2026-10-31, GitHub issues #1-#13; see `PAPER_ISSUES.md`)
+
+Code changes, all verified on the existing checkpoints (old runs reproduce to 1e-5 through `wm2cx/ckpt.py`):
+
+| issue | fix | where |
+|---|---|---|
+| #1 block structure | `shuffled` is now a Maslov-Sneppen switch rewire (exact edge count, degrees, no self-loops); new `block_shuffled` keeps every (pre-region, post-region) block count | `wm2cx/rewire.py`, `wm2cx/student.py` |
+| #2 signs | all controls take one sign per presynaptic neuron (Dale) with the inhibitory *edge* fraction matched to the real 0.50; new `connectome_randsign` (same softplus parametrisation, permuted neurotransmitter identity) | `student.build_edges`, `dale_signs` |
+| #3 parameters | `W_in` feeds the 2,330 VIS neurons only (3.71M total, 2.5 % recurrent); `param_breakdown()` reported in every run JSON and table; optional `--in_rank` bottleneck | `student.py`, `train.py` |
+| #4 GRU matching | `--gru_hidden 0` picks the largest GRU with <= the FlyBrain parameter count (762 for K=1); both models receive the blackout flag (`--vis_flag`); `--val` carves a validation split for the lr sweep in `run_v2.sh` | `student.gru_hidden_for`, `train.py` |
+| #5 causal targets | `collect.py --causal 1` (default): the target at step t is the latent of the clip ending at t (8x teacher cost, ~18 s/episode) | `scripts/collect.py` |
+| #6 baselines | const-mean and copy-last rows, raw-space MSE, in every run JSON and in `summary.md` | `train.py`, `summarize.py` |
+| #7 heading | `actions_only` (ridge on cumulative actions) and `actions_integ` (analytic integrator ceiling) baselines; 762-feature matched probe | `scripts/eval_hd.py` |
+| #8 statistics | per-episode errors saved (`*_episodes.npz`), bootstrap 95 % CIs and seed-paired CIs of the difference vs `connectome`; second blind window (t0=12) | `train.py`, `summarize.py` |
+| #9 planner | `--dynamics oracle_state` / `oracle_render` upper bounds, `--iters`, SPL and steps-to-goal | `scripts/eval_plan.py` |
+| #10 NYC split | `scripts/split_geo.py`: whole grid cells assigned to train/val/test (70/15/15) with the min start distance to training reported | `scripts/split_geo.py` |
+| #11 sparse compute | recurrence is a gather / `index_add_` over the edge list; no dense N x N anywhere in training; K=3 fits (760 MB); `scripts/bench.py` gives p50/p95 latency, FLOPs and memory | `student.py`, `scripts/bench.py` |
+| #13 subgraph | `scripts/build_connectome_ablations.py` builds min_syn {1,5,10} and region ablations | |
+
+Diagnostics already obtained with the old checkpoints:
+
+* Planner (issue #9): with ground-truth dynamics and ground-truth cost the same CEM search reaches 90 % success / SPL 0.77 on NAV
+  (10 episodes), but with ground-truth dynamics and the **student goal-latent cost** it reaches 0 %. The failure is the
+  goal-latent cost, not the search or the student's dynamics. Fix the goal encoding before re-running E2.
+* Heading (issue #7): a linear ridge on cumulative action counts gives 39° median error (R² 0.13); the analytic integrator gives
+  ~0°. The connectome probe (9.5°) therefore reads out a non-trivial linear representation of the integrated actions, but
+  heading is fully determined by the actions. Feature-matched (762 neurons) probe: 16-19°, still better than GRU (37°).
+* Latency (`results/bench_cpu.json`, M1 CPU, batch 1): connectome 0.33 ms/step, dense 7.2 ms, matched GRU 0.36 ms; K=3 1.2 ms.
+
+Everything else needs the rerun: `scripts/run_v2.sh` (resumable; causal data ~12 h on the M1 teacher, then ~5 min per training run,
+45 runs). Old results in the tables above used non-causal targets and the old controls and are superseded once it finishes.
+Still open after the rerun: NYC scale and appearance shifts (#10), closed-loop blackout (#9/#10), manuscript text (#12).

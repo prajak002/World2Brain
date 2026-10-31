@@ -30,8 +30,9 @@ biological ring attractor without ever being told about heading.
   coupling clones through the real cross-hemisphere (commissural) edges only.
 
 ## Controls (fixed: neuron count, region labels, I/O pathways, edge count)
-connectome (signed)  |  connectome without signs  |  degree-preserving shuffle  |  Erdos-Renyi random
-|  dense  |  parameter-matched GRU.
+connectome (signed)  |  connectome without signs  |  connectome with permuted (Dale-consistent) signs  |  Maslov-Sneppen degree-preserving
+rewire  |  block-preserving (within-region) degree-preserving rewire  |  Erdos-Renyi random (Dale-consistent signs)  |  dense
+|  parameter-matched GRU (same blackout flag). All sparse controls have exactly the real edge count, no self-loops, and the real inhibitory edge fraction.
 
 ## Experiments
 E1 Blind-horizon latent prediction (8 visible steps, then 1..8 blind steps) on NAV and ARRANGE.
