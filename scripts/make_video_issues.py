@@ -346,7 +346,7 @@ def s_twin(pr):
     axm.scatter([P[t, 0]], [P[t, 1]], s=55, color=BAD if blind else C["connectome"], edgecolor=BG, lw=1.2, zorder=5)
     axm.add_patch(plt.Circle(G, 12.0, fc="none", ec=C["random"], lw=1, ls="--"))
     axm.set_xlim(c0[0] - 130, c0[0] + 130); axm.set_ylim(c0[1] - 90, c0[1] + 90); axm.set_aspect("equal")
-    axm.set_title("map: real footprints shaded by height, goal ★ with 12 m radius, path (red = blind)", fontsize=10, loc="left", color=TXT2)
+    axm.set_title("map: footprints by height, goal ★ (12 m radius), path, red = blind", fontsize=10, loc="left", color=TXT2)
     axm.text(0.01, 0.02, f"shortest path {TWIN_META['shortest_path_m']:.0f} m · walked {TWIN_META['path_len_m']:.0f} m · collisions {TWIN_META['collisions']} · success {TWIN_META['success']:.0f}", transform=axm.transAxes, fontsize=9.5, color=TXT2)
     # planner table on the twin
     axt = fig.add_axes([0.58, 0.11, 0.40, 0.17]); axt.axis("off"); axt.set_xlim(0, 1); axt.set_ylim(0, 1); al = ease(pr * 2.5 - 1.4)
