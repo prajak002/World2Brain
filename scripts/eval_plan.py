@@ -23,6 +23,9 @@ p.add_argument("--iters", type=int, default=2); p.add_argument("--elite_frac", t
 p.add_argument("--device", default="mps"); p.add_argument("--policy", default="mpc", choices=["mpc", "random", "scripted"]); p.add_argument("--seed", type=int, default=7)
 p.add_argument("--dynamics", default="student", choices=["student", "oracle", "render_student", "render_teacher"])
 p.add_argument("--goal_mode", default="headings", choices=["headings", "pose"]); p.add_argument("--turn_noise", type=float, default=0.0)
+p.add_argument("--env", default="arena", choices=["arena", "nyc"]); p.add_argument("--appearance", default="clear", help="nyc: clear|overcast|fog|dusk|night (#10)")
+p.add_argument("--blackout", type=int, default=0, help="closed-loop blackout length in steps (1/3/5 s at 1 step/s); 0 = none (#10)")
+p.add_argument("--blackout_trigger", default="obstacle", choices=["obstacle", "fixed"], help="start the blackout at the first obstacle encounter, or at step 8")
 p.add_argument("--tag", default="")
 a = p.parse_args()
 dev = a.device; rng = np.random.default_rng(a.seed); torch.manual_seed(a.seed)
@@ -63,7 +66,8 @@ def encode_frames(imgs, W=None):
 
 def goal_pose(env):
     """Position (and arrival heading) the agent should reach; box placed in its zone for arrangement."""
-    if a.task == "nav": pos = env.lm[env.goal]; saved = None
+    if a.env == "nyc": pos = env.goal; saved = None
+    elif a.task == "nav": pos = env.lm[env.goal]; saved = None
     else:
         saved = env.box.copy(); env.box[0] = env.zone[0]; u = (env.zone[0] - saved[0]); u = u / (np.linalg.norm(u) + 1e-6)
         pos = np.clip(env.zone[0] - 1.3 * u, 0.6, env.size - 0.6)
@@ -120,26 +124,59 @@ def plan(env, h, zg, W):
     return int(best_seq[0])
 
 
-succ, dist0, dist1 = [], [], []
+def make_env(ep):
+    if a.env == "nyc":
+        from wm2cx.nyc import NYCArena
+        global _nyc
+        if "_nyc" not in globals(): _nyc = NYCArena(res=256, seed=10_000, appearance=a.appearance)
+        _nyc.rng = np.random.default_rng(10_000 + ep); return _nyc
+    return FlyArena(task=a.task, res=256, n_boxes=1, seed=10_000 + ep, turn_noise=a.turn_noise)
+
+
+def obstacle(env):
+    if a.env == "nyc": return env.obstacle_ahead()
+    tgt = env.lm[env.goal] if a.task == "nav" else env.box[0]; return np.linalg.norm(tgt - env.pos) < 2.0   # arena has no walls to hit: near the target
+
+
+def scripted(env):
+    return env.policy(rng, 0.0) if a.env == "nyc" else scripted_policy(env, rng, 0.0)
+
+
+succ, dist0, dist1, spl, coll, blind_steps = [], [], [], [], [], []
 for ep in range(a.episodes):
-    env = FlyArena(task=a.task, res=256, n_boxes=1, seed=10_000 + ep, turn_noise=a.turn_noise); img = env.reset(); dist0.append(env.goal_distance())
+    env = make_env(ep); img = env.reset(); dist0.append(env.goal_distance())
+    # SPL reference: shortest path to the success radius (12 m on NYC streets via the walkability grid, 1.2 m straight line in the arena)
+    shortest = max((env.shortest_path_length() - 12.0) if a.env == "nyc" else (env.goal_distance() - 1.2), 1e-6); travelled = 0.0; pos_prev = env.pos.copy()
+    blind_left = 0; blind_used = 0; triggered = False
     with torch.no_grad():
         W = model.edge_weights() if model is not None else None
         zg = encode_goal(env, W) if (a.policy == "mpc" and a.dynamics != "oracle") else None
         h = model.init_state(1, dev) if model is not None else None; s = 0
         prev = torch.zeros(1, dtype=torch.long, device=dev)
         for t in range(a.steps):
-            if model is not None: h = model.step(h, eye(img)[None], prev, torch.ones(1, device=dev), W)
-            if a.policy == "mpc": ac = plan(env, h, zg, W)
+            # blackout in the loop: the controller loses vision for a.blackout steps, starting at the first obstacle encounter (or step 8)
+            if a.blackout and not triggered and ((a.blackout_trigger == "fixed" and t == 8) or (a.blackout_trigger == "obstacle" and obstacle(env))):
+                blind_left = a.blackout; triggered = True
+            visible = blind_left == 0
+            if not visible: blind_left -= 1; blind_used += 1
+            if model is not None:
+                o = eye(img)[None] if visible else torch.zeros(1, eh * ew * 3, device=dev)
+                h = model.step(h, o, prev, torch.full((1,), float(visible), device=dev), W)
+            if a.policy == "mpc":
+                if not visible and a.dynamics != "student": ac = int(rng.integers(1, 4))   # oracle/render planners "see"; deny them during blackout
+                else: ac = plan(env, h, zg, W)
             elif a.policy == "random": ac = int(rng.integers(1, 4))
-            else: ac = scripted_policy(env, rng, 0.0)
+            else: ac = scripted(env)
             img, s = env.step(ac); prev = torch.tensor([ac], device=dev)
+            travelled += float(np.linalg.norm(env.pos - pos_prev)); pos_prev = env.pos.copy()
             if s: break
-    succ.append(s); dist1.append(env.goal_distance())
-    if ep % 10 == 0: print(f"ep {ep} success so far {np.mean(succ):.2f}", flush=True)
-res = dict(run=a.run, task=a.task, policy=a.policy, dynamics=a.dynamics if a.policy == "mpc" else "-", goal_mode=a.goal_mode, horizon=a.horizon,
-           iters=a.iters, n_cand=a.n_cand, success=float(np.mean(succ)), dist_start=float(np.mean(dist0)), dist_end=float(np.mean(dist1)),
-           episodes=a.episodes, steps=a.steps, turn_noise=a.turn_noise)
+    succ.append(s); dist1.append(env.goal_distance()); spl.append(s * shortest / max(shortest, travelled, 1e-6))
+    coll.append(getattr(env, "collisions", 0) / max(travelled / 100.0, 1e-6) if a.env == "nyc" else 0.0); blind_steps.append(blind_used)
+    if ep % 10 == 0: print(f"ep {ep} success so far {np.mean(succ):.2f} SPL {np.mean(spl):.2f}", flush=True)
+res = dict(run=a.run, env=a.env, appearance=a.appearance, task=a.task, policy=a.policy, dynamics=a.dynamics if a.policy == "mpc" else "-", goal_mode=a.goal_mode,
+           horizon=a.horizon, iters=a.iters, n_cand=a.n_cand, success=float(np.mean(succ)), spl=float(np.mean(spl)),
+           collisions_per_100m=float(np.mean(coll)), blackout=a.blackout, blackout_trigger=a.blackout_trigger, blind_steps_mean=float(np.mean(blind_steps)),
+           dist_start=float(np.mean(dist0)), dist_end=float(np.mean(dist1)), episodes=a.episodes, steps=a.steps, turn_noise=a.turn_noise)
 print(json.dumps(res)); os.makedirs("results/plan", exist_ok=True)
-suffix = "" if a.dynamics == "student" or a.policy != "mpc" else f"_{a.dynamics}"
+suffix = ("" if a.dynamics == "student" or a.policy != "mpc" else f"_{a.dynamics}") + ("" if a.env == "arena" else f"_{a.env}_{a.appearance}") + (f"_blackout{a.blackout}" if a.blackout else "")
 json.dump(res, open(f"results/plan/{a.run}_{a.task}_{a.policy}{suffix}{a.tag}.json", "w"))

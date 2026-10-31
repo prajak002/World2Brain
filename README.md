@@ -175,6 +175,19 @@ GRU 48.6 / 45.5. The task is much harder than the synthetic arena (120 episodes,
 clutter): absolute prediction quality is low for every student; the real wiring is nominally best at every horizon
 and here also beats the GRU, but none of these gaps has a confidence interval yet. Needs ≥3 seeds, ≥3 locations with
 a geographic train/val/test split, and scaled collection before any claim is made (#8, #10).
+
+Benchmark protocol for run 3 (#10, tooling in place, data not yet collected):
+- `scripts/collect_nyc_multi.sh`: four locations (Times Square, Flatiron, FiDi, Upper West Side), one server restart
+  per location, then `scripts/split_geo.py`, which assigns whole 120 m blocks of start positions to train / val / test
+  (70 / 15 / 15) *before* training and reports the minimum train–test trajectory distance (`--margin 40` drops test
+  episodes closer than that). Collection speed (80 s/episode on the M1) is the bottleneck; a GPU box or the Windows /
+  UE5 client is needed for ≥1,000 episodes.
+- Closed-loop blackout: `scripts/eval_plan.py --env nyc --blackout {1,3,5} --blackout_trigger obstacle` cuts the
+  controller's vision for 1/3/5 steps at the first obstacle encounter (building ahead) and reports success, SPL
+  (shortest grid path to the 12 m success radius / path travelled) and collisions per 100 m. Oracle/render planners are
+  denied actions during the blackout so only the student can imagine through it.
+- Appearance shifts: `NYCArena(appearance=clear|overcast|fog|dusk|night)` (fog distance, sun azimuth, sky colour, light
+  level) for train-on-clear / test-on-shift evaluation; `--appearance` on `eval_plan.py`.
 Video: `results/video/wm2cx_nyc_explained.mp4` (`scripts/make_video_explained.py --data data/nyc_test.npz ...`).
 
 ## Web pages
