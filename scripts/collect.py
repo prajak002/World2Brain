@@ -11,6 +11,7 @@ p.add_argument("--n_boxes", type=int, default=1); p.add_argument("--seed", type=
 p.add_argument("--out", default=None); p.add_argument("--device", default="mps")
 p.add_argument("--env", default="arena", choices=["arena", "valdrada"]); p.add_argument("--save_frames", type=int, default=0, help="also store frames downsampled to this size")
 p.add_argument("--lat", type=float, default=40.7580); p.add_argument("--lon", type=float, default=-73.9855)
+p.add_argument("--turn_noise", type=float, default=0.0, help="arena only: relative sd of the turn angle (continuous/noisy turns, #7)")
 a = p.parse_args()
 ew, eh = map(int, a.eye.split("x"))
 out = a.out or f"data/{a.task}_s{a.seed}.npz"
@@ -34,7 +35,7 @@ for ep in range(a.episodes):
             try: img = env.reset(); break
             except RuntimeError as e: print("reset retry:", e, flush=True)
     else:
-        env = FlyArena(task=a.task, res=a.res, n_boxes=a.n_boxes, seed=a.seed * 100000 + ep); img = env.reset(); pol = lambda: scripted_policy(env, rng, eps)
+        env = FlyArena(task=a.task, res=a.res, n_boxes=a.n_boxes, seed=a.seed * 100000 + ep, turn_noise=a.turn_noise); img = env.reset(); pol = lambda: scripted_policy(env, rng, eps)
     eps = float(rng.choice([0.1, 0.3, 0.6]))
     for _ in range(int(rng.integers(0, 40)) if venv is None else 0):  # random warm-up so arrangement episodes start mid-task
         img, _ = env.step(pol())

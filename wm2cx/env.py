@@ -15,10 +15,12 @@ COLORS = np.array([[220, 60, 60], [60, 200, 80], [70, 90, 230], [235, 200, 50], 
 
 
 class FlyArena:
-    def __init__(self, task="nav", size=12.0, n_landmarks=4, n_boxes=2, res=256, seed=0):
+    def __init__(self, task="nav", size=12.0, n_landmarks=4, n_boxes=2, res=256, seed=0, turn_noise=0.0):
+        """turn_noise > 0 makes every turn a continuous angle, pi/8 * (1 + N(0, turn_noise)), so relative heading is no
+        longer a linear function of the discrete action counts and path integration becomes non-trivial (#7)."""
         self.task, self.size, self.res = task, size, res
         self.nl, self.nb = n_landmarks, n_boxes if task == "arrange" else 0
-        self.rng = np.random.default_rng(seed)
+        self.rng = np.random.default_rng(seed); self.turn_noise = turn_noise
         self.step_len, self.fov_cols = 0.6, res
         self.reset()
 
@@ -40,10 +42,15 @@ class FlyArena:
         return self.render()
 
     def state(self):
-        return dict(pos=self.pos.copy(), heading=float(self.heading), box=self.box.copy())
+        return dict(pos=self.pos.copy(), heading=float(self.heading), box=self.box.copy(), t=self.t)
 
-    def step(self, a: int):
+    def set_state(self, s):
+        self.pos, self.heading, self.box, self.t = s["pos"].copy(), float(s["heading"]), s["box"].copy(), s.get("t", self.t)
+
+    def step(self, a: int, render=True):
+        """Apply action a. render=False skips the panorama (returns None) for ground-truth-state planning rollouts."""
         d, dth = ACTIONS[int(a)]
+        if dth != 0.0 and self.turn_noise > 0: dth *= 1.0 + self.turn_noise * self.rng.normal()
         self.heading = (self.heading + dth + np.pi) % (2 * np.pi) - np.pi
         if d != 0.0:
             new = self.pos + d * self.step_len * np.array([np.cos(self.heading), np.sin(self.heading)])
@@ -56,7 +63,7 @@ class FlyArena:
                     self.box[i] = np.clip(self.box[i] + mv, 1.5, self.size - 1.5)
             self.pos = new  # landmarks are visual beacons, not obstacles
         self.t += 1
-        return self.render(), self.success()
+        return (self.render() if render else None), self.success()
 
     def success(self):
         if self.task == "nav":

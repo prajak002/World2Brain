@@ -60,6 +60,13 @@ Reading: sparse recurrent students path-integrate heading in the dark (about 10�
 and GRU students do not (about 36°). The 51 EPG neurons alone carry almost no heading signal, so there is
 no emergent ring attractor at this scale. Signs matter for the heading code even though they do not for MSE.
 
+Caveat (#7): turns are discrete and fixed-angle (±22.5°) and the one-hot action is fed to CX/OUT neurons, so
+relative heading equals 22.5° × (#left − #right) and any leaky integrator of the action input exposes it linearly.
+The table above also uses 6,935 features for FlyBrain vs 1,400 for the GRU. `scripts/eval_hd.py` now reports an
+`actions only` ridge (cumulative action counts, no neural state) and an `all@1400` feature-matched probe next to every
+run; a population only "encodes heading" if it beats the action-only floor. These columns are empty for run 1 until
+the probes are rerun. `scripts/collect.py --turn_noise 0.3` makes turn angles continuous so integration is non-trivial.
+
 ### E2 Teacher-free planning (latent CEM-MPC in the live arena, 30 episodes)
 | policy | nav success | arrange success |
 |---|---|---|
@@ -71,6 +78,15 @@ no emergent ring attractor at this scale. Signs matter for the heading code even
 
 Reading: the planner fails for every student, so E2 says nothing about wiring yet. Goal-latent encoding
 and the 6-step CEM search need rework before this experiment is informative.
+
+Planner validation ladder (#9, `scripts/eval_plan.py --dynamics ...`): `oracle` (ground-truth state, cost = goal
+distance) isolates the CEM search; `render_teacher` / `render_student` (ground-truth rollouts, frames encoded by the
+teacher or by the student with eyes open) isolate the latent goal cost; `student` is the teacher-free number. On the
+arena the oracle search solves NAV 10/10 (goal distance 5.6 → 1.0; horizon 8, 3 CEM iterations, 64 candidates), so the
+search is not the failure. It still solves ARRANGE 0/6 at horizon 8: pushing needs longer coordinated sequences, so
+that task fails for reasons unrelated to any student. `--goal_mode pose` encodes one frame at the goal pose instead of
+the nearest of 8 headings; `--horizon`, `--iters`, `--n_cand` are exposed. The remaining student-dynamics runs need the
+checkpoints (not in the repo).
 
 ### Open items
 1. Fix the MPC planner (E2) before any planning comparison.
