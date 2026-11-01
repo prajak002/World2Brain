@@ -48,7 +48,7 @@ if stage data; then                                                             
 fi
 for f in data/nav_train.npz data/arrange_train.npz data/nav_test.npz data/arrange_test.npz; do [ -f "$f" ] || { echo "missing $f (run STAGES=data)"; exit 1; }; done
 [ -f data/nyc/midtown_buildings.json ] || bash scripts/fetch_nyc_data.sh         # raycast twin inputs (public, ~1 MB)
-$PY -m pytest tests -q
+uv pip install --quiet pytest; $PY -m pytest tests -q
 
 # ---- stages ---------------------------------------------------------------------------------------------------
 stage() { case " $STAGES " in *" $1 "*) echo; echo "##### $1  $(date +%T)"; return 0;; *) return 1;; esac; }
