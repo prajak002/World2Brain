@@ -128,3 +128,8 @@ MSE vs shuffled 0.906, random 0.917, GRU 0.907; heading probe 19.7° visible for
 * Compute: `scripts/vast_launch.sh` rents one RTX 4090 on Vast.ai and drives `scripts/aws_h100.sh` (stages seeds, hd,
   plan, bench, ablate, realvid). Everything the M1 produced (data/*.npz, data/raw FlyWire files, checkpoints) must be
   pushed first; this Windows box has none of it.
+* Codebase reconciled with the M1 branch (issues #1-#5): controls are now Maslov-Sneppen / block-preserving / ER with
+  Dale-consistent, edge-fraction-matched signs; W_in is VIS-only (3.7M params); the GRU is parameter-matched with a shared
+  blackout flag; teacher targets are causal. All numbers above predate these fixes. The key open scientific question is
+  unchanged: does the real wiring beat `block_shuffled`? If not, the claim is "region-level architecture matters", not
+  "synapse-level identity matters" (PAPER_ISSUES.md B1).

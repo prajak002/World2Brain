@@ -1,0 +1,227 @@
+{
+ "device": "mps",
+ "batch": 1,
+ "torch": "2.15.0",
+ "rows": [
+  {
+   "model": "connectome K=1",
+   "neurons": 6935,
+   "params": 3714529,
+   "edges": 91663,
+   "p50_ms": 0.9745209999891813,
+   "p95_ms": 1.153574400314028,
+   "mflops_per_step": 7.387448,
+   "peak_mem_mb": 40.390625
+  },
+  {
+   "model": "connectome_nosign K=1",
+   "neurons": 6935,
+   "params": 3714529,
+   "edges": 91663,
+   "p50_ms": 1.1637914999482746,
+   "p95_ms": 1.348803850441982,
+   "mflops_per_step": 7.387448,
+   "peak_mem_mb": 40.375
+  },
+  {
+   "model": "connectome_randsign K=1",
+   "neurons": 6935,
+   "params": 3714529,
+   "edges": 91663,
+   "p50_ms": 1.2020620001749194,
+   "p95_ms": 1.3643812498230545,
+   "mflops_per_step": 7.387448,
+   "peak_mem_mb": 40.375
+  },
+  {
+   "model": "shuffled K=1",
+   "neurons": 6935,
+   "params": 3714529,
+   "edges": 91663,
+   "p50_ms": 1.0808959996211343,
+   "p95_ms": 1.1803246998169925,
+   "mflops_per_step": 7.387448,
+   "peak_mem_mb": 40.375
+  },
+  {
+   "model": "block_shuffled K=1",
+   "neurons": 6935,
+   "params": 3714529,
+   "edges": 91663,
+   "p50_ms": 1.0778124997159466,
+   "p95_ms": 1.163545550480194,
+   "mflops_per_step": 7.387448,
+   "peak_mem_mb": 40.375
+  },
+  {
+   "model": "random K=1",
+   "neurons": 6935,
+   "params": 3714529,
+   "edges": 91663,
+   "p50_ms": 0.969499999882828,
+   "p95_ms": 1.0540791502080538,
+   "mflops_per_step": 7.387448,
+   "peak_mem_mb": 40.375
+  },
+  {
+   "model": "dense K=1",
+   "neurons": 6935,
+   "params": 51717091,
+   "edges": 48094225,
+   "p50_ms": 3.991291500369698,
+   "p95_ms": 4.452301449373408,
+   "mflops_per_step": 103.392572,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "gru(h=762) K=1-matched",
+   "neurons": 762,
+   "params": 3711196,
+   "edges": 580644,
+   "p50_ms": 0.6774369999220653,
+   "p95_ms": 0.7452562494563608,
+   "mflops_per_step": 7.413248,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "connectome K=2",
+   "neurons": 13870,
+   "params": 7428802,
+   "edges": 183326,
+   "p50_ms": 1.5415419998134894,
+   "p95_ms": 1.731762849613005,
+   "mflops_per_step": 14.774384,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "connectome_nosign K=2",
+   "neurons": 13870,
+   "params": 7428802,
+   "edges": 183326,
+   "p50_ms": 1.5531460003330722,
+   "p95_ms": 1.7222145993400766,
+   "mflops_per_step": 14.774384,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "connectome_randsign K=2",
+   "neurons": 13870,
+   "params": 7428802,
+   "edges": 183326,
+   "p50_ms": 1.5783540002303198,
+   "p95_ms": 1.856741050278287,
+   "mflops_per_step": 14.774384,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "shuffled K=2",
+   "neurons": 13870,
+   "params": 7428802,
+   "edges": 183326,
+   "p50_ms": 1.4741244999640912,
+   "p95_ms": 1.5917493503820879,
+   "mflops_per_step": 14.774384,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "block_shuffled K=2",
+   "neurons": 13870,
+   "params": 7428802,
+   "edges": 183326,
+   "p50_ms": 1.4651250003225869,
+   "p95_ms": 1.606153850116243,
+   "mflops_per_step": 14.774384,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "random K=2",
+   "neurons": 13870,
+   "params": 7428802,
+   "edges": 183326,
+   "p50_ms": 1.4284369999586488,
+   "p95_ms": 1.545350000151302,
+   "mflops_per_step": 14.774384,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "gru(h=1200) K=2-matched",
+   "neurons": 1200,
+   "params": 7421056,
+   "edges": 1440000,
+   "p50_ms": 0.953750000007858,
+   "p95_ms": 1.0220711499641766,
+   "mflops_per_step": 14.827712,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "connectome K=3",
+   "neurons": 20805,
+   "params": 11143075,
+   "edges": 274989,
+   "p50_ms": 1.9786664997809567,
+   "p95_ms": 2.462677400035318,
+   "mflops_per_step": 22.16132,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "connectome_nosign K=3",
+   "neurons": 20805,
+   "params": 11143075,
+   "edges": 274989,
+   "p50_ms": 2.028458499808039,
+   "p95_ms": 2.408968399777222,
+   "mflops_per_step": 22.16132,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "connectome_randsign K=3",
+   "neurons": 20805,
+   "params": 11143075,
+   "edges": 274989,
+   "p50_ms": 1.4273125002546294,
+   "p95_ms": 1.8426479498884873,
+   "mflops_per_step": 22.16132,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "shuffled K=3",
+   "neurons": 20805,
+   "params": 11143075,
+   "edges": 274989,
+   "p50_ms": 1.7348534997836396,
+   "p95_ms": 2.187522300846467,
+   "mflops_per_step": 22.16132,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "block_shuffled K=3",
+   "neurons": 20805,
+   "params": 11143075,
+   "edges": 274989,
+   "p50_ms": 1.4890830002514122,
+   "p95_ms": 1.9482645497191693,
+   "mflops_per_step": 22.16132,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "random K=3",
+   "neurons": 20805,
+   "params": 11143075,
+   "edges": 274989,
+   "p50_ms": 1.8855000002986344,
+   "p95_ms": 2.1301347993357918,
+   "mflops_per_step": 22.16132,
+   "peak_mem_mb": 1064.375
+  },
+  {
+   "model": "gru(h=1544) K=3-matched",
+   "neurons": 1544,
+   "params": 11141760,
+   "edges": 2383936,
+   "p50_ms": 1.1888330000147107,
+   "p95_ms": 1.2730725992696532,
+   "mflops_per_step": 22.264992,
+   "peak_mem_mb": 1064.375
+  }
+ ]
+}

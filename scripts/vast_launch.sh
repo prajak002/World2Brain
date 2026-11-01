@@ -7,7 +7,7 @@
 #   bash scripts/vast_launch.sh search                      # list the cheapest matching offers
 #   bash scripts/vast_launch.sh create <OFFER_ID>           # rent it (prints the instance id)
 #   bash scripts/vast_launch.sh push <INSTANCE_ID>          # data/*.npz (+ raw FlyWire files, realvid) -> instance
-#   bash scripts/vast_launch.sh run <INSTANCE_ID> "seeds hd plan bench ablate realvid"
+#   bash scripts/vast_launch.sh run <INSTANCE_ID> "data lr seeds hd plan bench ablate realvid"
 #   bash scripts/vast_launch.sh log <INSTANCE_ID>           # tail the log
 #   bash scripts/vast_launch.sh pull <INSTANCE_ID>          # results/ (JSON, md, png; checkpoints too) -> laptop
 #   bash scripts/vast_launch.sh destroy <INSTANCE_ID>       # stop paying
@@ -40,7 +40,7 @@ case "$cmd" in
     ls results/runs/*.pt >/dev/null 2>&1 && scp -o StrictHostKeyChecking=no -P "$port" results/runs/*.pt root@"$host":/root/World2Brain/results/runs/
     ssh -p "$port" root@"$host" 'cd /root/World2Brain && git pull -q && ls -la data | head -30' ;;
   run)
-    read -r host port < <(ssh_target "$id"); stages=${3:-"seeds hd plan bench ablate realvid"}
+    read -r host port < <(ssh_target "$id"); stages=${3:-"data lr seeds hd plan bench ablate realvid"}
     ssh -p "$port" root@"$host" "cd /root/World2Brain && git pull -q && mkdir -p logs && tmux new -d -s wm2cx \"STAGES='$stages' PY='\$HOME/.local/bin/uv run python' bash scripts/aws_h100.sh 2>&1 | tee logs/vast_\$(date +%F_%H%M).log\" && echo started; tmux ls" ;;
   log)
     read -r host port < <(ssh_target "$id"); ssh -p "$port" root@"$host" 'tail -n 40 /root/World2Brain/logs/vast_*.log; nvidia-smi --query-gpu=utilization.gpu,memory.used --format=csv,noheader' ;;

@@ -1,0 +1,1 @@
+{"run": "connectome_K1_s0", "task": "nav", "policy": "mpc", "dynamics": "oracle_state", "success": 1.0, "spl": 0.8304023296532306, "dist_start": 5.241537050904076, "dist_end": 0.9271712382157205, "steps_to_goal": 15.8, "episodes": 5, "steps": 30, "horizon": 6, "n_cand": 32, "iters": 1}

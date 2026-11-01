@@ -37,6 +37,7 @@ p.add_argument("--turn_deg", type=float, default=6.0, help="|yaw| per step above
 p.add_argument("--fwd_px", type=float, default=1.0, help="radial expansion per step above which the step is forward (below -x: back)")
 p.add_argument("--grid", type=int, default=4); p.add_argument("--device", default="none")
 p.add_argument("--save_frames", type=int, default=64, help="also store frames at this size for videos/figures (0 = off)")
+p.add_argument("--causal", type=int, default=1, help="teacher target at step t from the clip ending at t (#5); must match the students' training data")
 a = p.parse_args()
 ew, eh = map(int, a.eye.split("x"))
 
@@ -93,8 +94,13 @@ def add_teacher(d, device):
     teacher = VJEPA21Encoder("vitb", crop=a.res, frames=2 * a.clip).to(device)
     full = d["frames_full"]; E, T = full.shape[:2]; Z = []
     for i in range(E):
-        clips = full[i].reshape(T // a.clip, a.clip, a.res, a.res, 3).repeat(2, axis=1)       # 1 env step = 1 tubelet, like collect.py
-        Z.append(teacher.per_step_latents(torch.from_numpy(np.ascontiguousarray(clips)).to(device)).cpu().numpy().reshape(T, -1).astype(np.float16))
+        fr = full[i]
+        if a.causal:   # clip ending at t, like collect.py --causal 1
+            padded = np.concatenate([np.repeat(fr[:1], a.clip - 1, 0), fr]); idx = np.arange(T)[:, None] + np.arange(a.clip)[None]; clips = padded[idx].repeat(2, axis=1)
+            Z.append(np.concatenate([teacher.per_step_latents(torch.from_numpy(np.ascontiguousarray(clips[j:j + 8])).to(device))[:, -1].cpu().numpy() for j in range(0, T, 8)]).astype(np.float16))
+        else:
+            clips = fr.reshape(T // a.clip, a.clip, a.res, a.res, 3).repeat(2, axis=1)       # 1 env step = 1 tubelet
+            Z.append(teacher.per_step_latents(torch.from_numpy(np.ascontiguousarray(clips)).to(device)).cpu().numpy().reshape(T, -1).astype(np.float16))
     d["z"] = np.stack(Z); print("teacher latents", d["z"].shape)
     return d
 

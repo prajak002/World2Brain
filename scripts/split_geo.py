@@ -61,7 +61,7 @@ if a.margin > 0 and md < a.margin:
 os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
 for s, n in enumerate(names):
     idx = np.where(split == s)[0]
-    np.savez_compressed(f"{a.out}_{n}.npz", **{k: v[idx] for k, v in D.items()})
+    np.savez_compressed(f"{a.out}_{n}.npz", **{k: (v[idx] if getattr(v, "ndim", 0) > 0 and len(v) == E else v) for k, v in D.items()})
     print(f"{n:5s} {len(idx):4d} episodes, {len({(int(loc[e]), int(bx[e]), int(by[e])) for e in idx})} blocks, {len(set(loc[idx].tolist()))} locations")
 meta = dict(files=a.raw, block_m=a.block, frac=a.frac, seed=a.seed, n_episodes=int(E), n_blocks=len(blocks),
             per_split={n: int((split == s).sum()) for s, n in enumerate(names)}, unused=int((split == -1).sum()),

@@ -10,8 +10,8 @@ two trivial predictors for the same episodes to results/baselines/ (same keys as
   python scripts/eval_ckpt.py --run connectome_K1_s0 --test data/realvid_all.npz --tag _realvid_ft --finetune_epochs 10 --device cuda
 """
 import argparse, json, os, copy, time, numpy as np, torch
-from wm2cx.student import FlyBrain, GRUBaseline
-from wm2cx.data import Latents, load_split, blackout, parse_windows, window_errors
+from wm2cx.ckpt import build_model, latents_from
+from wm2cx.data import load_split, blackout, parse_windows, window_errors
 from wm2cx.connectome import load as load_conn
 
 p = argparse.ArgumentParser()
@@ -25,8 +25,8 @@ p.add_argument("--baselines", type=int, default=1, help="also write const_mean /
 a = p.parse_args()
 torch.manual_seed(a.seed); rng = np.random.default_rng(a.seed); dev = a.device
 
-ck = torch.load(f"results/runs/{a.run}.pt", map_location="cpu", weights_only=False); args = ck["args"]
-lat = Latents.__new__(Latents); lat.mu, lat.P, lat.scale, lat.explained = ck["lat"]["mu"], ck["lat"]["P"], float(ck["lat"]["scale"]), float("nan")
+ck = torch.load(f"results/runs/{a.run}.pt", map_location="cpu", weights_only=False); args = ck["args"]; lat = latents_from(ck)
+conn = load_conn(a.conn or args["conn"])
 te, _ = load_split(a.test, lat, keep_raw=True)
 clip = torch.from_numpy(np.concatenate([np.load(f)["clip"] if "clip" in np.load(f) else np.full(len(np.load(f)["obs"]), i) for i, f in enumerate(a.test)]).astype(np.int64))
 E, T = te["obs"].shape[:2]; windows = parse_windows(a.eval_windows, T); W0 = f"{windows[0][0]}:{windows[0][1]}"
@@ -34,9 +34,7 @@ k = te["z"].shape[-1]
 
 
 def build():
-    if args["wiring"] == "gru": m = GRUBaseline(te["obs"].shape[-1], k, args["gru_hidden"])
-    else: m = FlyBrain(load_conn(a.conn or args["conn"]), te["obs"].shape[-1], k, wiring=args["wiring"], n_brains=args["n_brains"], seed=args["seed"])
-    m.load_state_dict(ck["state"]); return m.to(dev)
+    m = build_model(args, conn, te["obs"].shape[-1], ck["state"]); m.load_state_dict(ck["state"]); return m.to(dev)
 
 
 def evaluate(model, d, idx):
