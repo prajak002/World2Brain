@@ -62,6 +62,9 @@ if stage lr; then                                                               
     [ -f results/runs/${w}_K1_s0_lr${lr}.json ] || $PY scripts/train.py --wiring $w --lr $lr --val 0.15 --epochs 10 --device "$DEVICE" --tag _lr${lr}
   done; done
 fi
+# pick each architecture's lr by validation MSE from the lr stage (falls back to the run-1 defaults when the sweep is absent)
+pick_lr() { $PY -c "import json,glob; r=[(json.load(open(f))['val_mse'],f.split('_lr')[-1][:-5]) for f in glob.glob('results/runs/$1_K1_s0_lr*.json')]; print(min(r)[1] if r else '$2')" 2>/dev/null || echo "$2"; }
+export LR_CONN=$(pick_lr connectome 2e-3) LR_DENSE=$(pick_lr dense 1e-3) LR_GRU=$(pick_lr gru 2e-3)
 stage seeds && EPOCHS=${EPOCHS:-20} NYC_TRAIN=${NYC_TRAIN:-data/nyc_twin_train.npz} NYC_TEST=${NYC_TEST:-data/nyc_twin_test.npz} bash scripts/run_seeds.sh   # #8 + data-efficiency axis
 
 if stage hd; then                                                               # #7: actions-only floor + feature-matched subset
