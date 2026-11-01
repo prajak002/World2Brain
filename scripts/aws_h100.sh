@@ -31,6 +31,9 @@ $PY -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_av
 cuda_ok || { echo "no usable CUDA"; exit 1; }
 # fast kernels: TF32 matmuls are fine for the student (edge-list index_add is fp32 either way)
 export TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
+# BLAS threads = real CPU quota (cgroup), not the host core count: oversubscription made numpy SVD hang on Vast
+Q=$(cut -d" " -f1 /sys/fs/cgroup/cpu.max 2>/dev/null); [ -n "$Q" ] && [ "$Q" != max ] && CPUS=$((Q / 100000)) || CPUS=$(nproc); CPUS=$(( CPUS < 1 ? 1 : (CPUS > 16 ? 16 : CPUS) ))
+export OMP_NUM_THREADS=$CPUS OPENBLAS_NUM_THREADS=$CPUS MKL_NUM_THREADS=$CPUS; echo "BLAS threads $CPUS"
 
 # ---- data -----------------------------------------------------------------------------------------------------
 [ -f data/connectome.npz ] || { [ -f data/raw/proofread_connections_783.feather ] && $PY -m wm2cx.connectome --out data/connectome.npz; }   # rebuild from the FlyWire raw files if only those were copied

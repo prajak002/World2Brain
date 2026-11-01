@@ -5,10 +5,13 @@ class Latents:
     def __init__(self, z_train, k=256):
         z = z_train.reshape(-1, z_train.shape[-1]).astype(np.float32)
         self.mu = z.mean(0); zc = z - self.mu
-        U, Sv, Vt = np.linalg.svd(zc[np.random.default_rng(0).choice(len(zc), min(len(zc), 20000), replace=False)], full_matrices=False)
-        self.P = Vt[:k].T.astype(np.float32)
+        # PCA via the D x D covariance (D = 3,840): equivalent to the SVD of the centred data but uses all samples and
+        # avoids the tall-matrix SVD, which hangs with oversubscribed BLAS threads on some cloud boxes.
+        C = (zc.T.astype(np.float64) @ zc.astype(np.float64)) / len(zc)
+        ev, V = np.linalg.eigh(C); order = np.argsort(ev)[::-1]; ev, V = np.clip(ev[order], 0, None), V[:, order]
+        self.P = np.ascontiguousarray(V[:, :k]).astype(np.float32)
         proj = zc @ self.P; self.scale = proj.std() + 1e-6
-        self.explained = float((Sv[:k] ** 2).sum() / (Sv ** 2).sum())
+        self.explained = float(ev[:k].sum() / max(ev.sum(), 1e-12))
     def __call__(self, z): return ((z.astype(np.float32) - self.mu) @ self.P) / self.scale
     def inverse(self, y): return y * self.scale @ self.P.T + self.mu
     def inverse_torch(self, y):
