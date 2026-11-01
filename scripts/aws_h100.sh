@@ -16,6 +16,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."; mkdir -p logs results/runs
 STAGES=${STAGES:-"data lr seeds hd plan bench ablate realvid"}
 export PYTHONPATH=. DEVICE=${DEVICE:-cuda} PY=${PY:-"uv run python"}
+stage() { case " $STAGES " in *" $1 "*) echo; echo "##### $1  $(date +%T)"; return 0;; *) return 1;; esac; }
 
 # ---- environment -----------------------------------------------------------------------------------------------
 command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -51,7 +52,6 @@ for f in data/nav_train.npz data/arrange_train.npz data/nav_test.npz data/arrang
 uv pip install --quiet pytest; $PY -m pytest tests -q
 
 # ---- stages ---------------------------------------------------------------------------------------------------
-stage() { case " $STAGES " in *" $1 "*) echo; echo "##### $1  $(date +%T)"; return 0;; *) return 1;; esac; }
 
 if stage lr; then                                                               # #4: per-architecture lr on a validation split, never on test
   for w in connectome gru dense; do for lr in 5e-4 1e-3 2e-3 4e-3; do
