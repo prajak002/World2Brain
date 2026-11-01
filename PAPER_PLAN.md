@@ -45,6 +45,12 @@ E3 Head-direction decodability: linear probe from EPG / CX / VIS / MB population
    are continuous and the action record no longer determines heading.
 E4 Multi-brain scaling K = 1,2,3.
 E5 Ablations: sign (Dale), region input routing, horizon.
+E6 Data efficiency: n_train in {50, 100, 200, 500, 1000} arena episodes, connectome vs degree-shuffled vs GRU, 3 seeds
+   (`train.py --n_train`; the experiment that can beat the GRU where a prior should matter).
+E7 Real-video transfer: handheld phone walking footage (no labels) -> episodes via `scripts/ingest_video.py` (egomotion
+   from patch phase correlation, quantised to the 5 arena actions; continuous yaw / expansion kept as `ego`), evaluated
+   zero-shot and with leave-one-clip-out fine-tuning by `scripts/eval_ckpt.py` for every K=1 checkpoint, against the
+   trivial predictors on the same episodes. Tags `_realvid`, `_realvid_ft` in summarize.py.
 
 ## Honest risk register (what reviewers will attack)
 * Synthetic arena, not real video. Mitigation in paper: add an ego-video benchmark (e.g. Habitat / RECON)
@@ -111,3 +117,14 @@ the wiring-identity gap is measured under every subgraph (`python -m wm2cx.conne
 Real-video-ish benchmark added via Valdrada (see README). 120/30 episodes at Times Square: connectome 0.885 mean blind
 MSE vs shuffled 0.906, random 0.917, GRU 0.907; heading probe 19.7° visible for connectome vs 48.6° GRU. Addresses the
 "synthetic arena" risk partially; collection is slow (~80 s/episode on M1), so scale needs a GPU box or the Windows release.
+
+## Status 2026-11-01: real video, GPU run plan
+* Real footage so far: three WhatsApp phone clips (night street + field, night market, temple crowd; 95 s total, portrait,
+  480-720 px, 30/60 fps) -> `data/realvid_all.npz`: 11 episodes of 24 steps at 2 Hz (stride 12, so neighbouring episodes
+  overlap by half; use per-clip CIs), action histogram stay/fwd/left/right/back = 0.12/0.41/0.28/0.15/0.05. Enough for a
+  smoke test of E7, not for a table: the target is >= 30 min of landscape walking video (>= 150 non-overlapping episodes,
+  several locations, day and night), ideally plus one public egocentric set with real odometry (RECON or SCAND) so the
+  flow-estimated actions can be validated against ground truth.
+* Compute: `scripts/vast_launch.sh` rents one RTX 4090 on Vast.ai and drives `scripts/aws_h100.sh` (stages seeds, hd,
+  plan, bench, ablate, realvid). Everything the M1 produced (data/*.npz, data/raw FlyWire files, checkpoints) must be
+  pushed first; this Windows box has none of it.

@@ -15,3 +15,9 @@ data/
 results/runs/*.pt
 results/valdrada/
 results/*.log
+
+# Data and checkpoints (not redistributed: FlyWire CC-BY-NC, large)
+data/*.npz
+data/raw/
+results/runs/*.pt
+logs/
