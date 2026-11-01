@@ -32,7 +32,7 @@ cuda_ok || { echo "no usable CUDA"; exit 1; }
 # fast kernels: TF32 matmuls are fine for the student (edge-list index_add is fp32 either way)
 export TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
 # BLAS threads = real CPU quota (cgroup), not the host core count: oversubscription made numpy SVD hang on Vast
-Q=$(cut -d" " -f1 /sys/fs/cgroup/cpu.max 2>/dev/null); [ -z "$Q" ] && Q=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null)   # cgroup v2, then v1
+Q=$(cut -d" " -f1 /sys/fs/cgroup/cpu.max 2>/dev/null || true); [ -z "$Q" ] && Q=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us 2>/dev/null || true) || true   # cgroup v2, then v1
 if [ -n "$Q" ] && [ "$Q" != max ] && [ "$Q" -gt 0 ]; then CPUS=$((Q / 100000)); else CPUS=$(nproc); fi; CPUS=$(( CPUS < 1 ? 1 : (CPUS > 16 ? 16 : CPUS) ))
 export OMP_NUM_THREADS=$CPUS OPENBLAS_NUM_THREADS=$CPUS MKL_NUM_THREADS=$CPUS; echo "BLAS threads $CPUS"
 
