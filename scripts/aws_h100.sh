@@ -20,12 +20,14 @@ export PYTHONPATH=. DEVICE=${DEVICE:-cuda} PY=${PY:-"uv run python"}
 # ---- environment -----------------------------------------------------------------------------------------------
 command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
-uv sync --quiet
-$PY - <<'EOF'
-import torch, sys
-ok = torch.cuda.is_available(); print("torch", torch.__version__, "cuda", ok, torch.cuda.get_device_name(0) if ok else "")
-sys.exit(0 if ok else 1)
-EOF
+[ "${SKIP_SYNC:-0}" = 1 ] || uv sync --quiet
+cuda_ok() { $PY -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() and torch.zeros(1).cuda().item()==0 else 1)" > /dev/null 2>&1; }
+if ! cuda_ok; then   # PyPI torch may be built for a newer CUDA than the host driver: fall back to the cu128 wheels (driver >= 570)
+  echo "torch cannot init CUDA on this driver; installing cu128 wheels"; uv pip install --quiet --reinstall --index-url https://download.pytorch.org/whl/cu128 torch torchvision
+  export PY="${PY/uv run/uv run --no-sync}"
+fi
+$PY -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+cuda_ok || { echo "no usable CUDA"; exit 1; }
 # fast kernels: TF32 matmuls are fine for the student (edge-list index_add is fp32 either way)
 export TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
 
