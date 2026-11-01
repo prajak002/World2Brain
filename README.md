@@ -220,6 +220,17 @@ Blind controllers take random actions (the scripted policy reads env state, so i
 collisions come from; the oracle planner re-plans after the blackout and absorbs up to 3 blind steps. These are the
 search-side ceilings for E2 on the twin: the student-dynamics rows still need checkpoints trained on twin episodes.
 
+## E7 Real handheld video (2026-11-01, tooling + pilot data)
+`scripts/ingest_video.py` turns unlabeled phone / GoPro footage into wm2cx episodes: centre square crop to 256 px, 2 steps/s,
+egomotion from a 4x4 patch-grid phase correlation (pure numpy) accumulated over 4 sub-frames per step, yaw in degrees via the
+horizontal FoV and radial expansion as a forward-motion proxy, quantised to the arena's five actions (continuous values kept
+in `ego`, integrated yaw in `heading` for the E3 probe). `scripts/eval_ckpt.py` evaluates any checkpoint on such a file in the
+checkpoint's own PCA space, zero-shot or with leave-one-clip-out fine-tuning, and writes train.py-compatible JSON plus the
+trivial predictors for the same episodes, so `summarize.py` shows E7 as its own tables (`_realvid`, `_realvid_ft`). Pilot:
+3 clips, 95 s, 11 overlapping episodes (`data/realvid_all.npz`, not committed); teacher latents are added on the GPU box
+(`--from_npz ... --device cuda`), and `scripts/aws_h100.sh` stage `realvid` runs every K=1 checkpoint through it.
+`scripts/vast_launch.sh` rents one RTX 4090 on Vast.ai and drives the GPU script end to end.
+
 ## Web pages
 - `docs/explainer.html`: plain-language five-scene explainer with results (also published at https://claude.ai/artifact/W8qroZnbBSigaW2W3CGW1P).
 - `docs/world_brain_split.html`: world view and 3D brain side by side on one shared step slider, Times Square episode at 768 px (https://claude.ai/artifact/86AKeF8BLACdNqbENmv2BB). Built by `scripts/build_split_page.py`.

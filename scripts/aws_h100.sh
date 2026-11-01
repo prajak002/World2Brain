@@ -6,14 +6,15 @@
 #   git clone https://github.com/prajak002/World2Brain.git && cd World2Brain
 #   # copy data/ from the M1 (connectome.npz, nav_*/arrange_*/nyc_* npz; checkpoints optional):
 #   #   rsync -av m1:~/worldmodel2connectom/data/ data/
-#   STAGES="seeds hd plan bench ablate" bash scripts/aws_h100.sh 2>&1 | tee logs/aws_$(date +%F).log
+#   STAGES="seeds hd plan bench ablate realvid" bash scripts/aws_h100.sh 2>&1 | tee logs/aws_$(date +%F).log
+#   (or from the laptop: scripts/vast_launch.sh, which rents a 4090 on Vast.ai and drives this script over ssh)
 #
 # Rough budget (H100, 20 epochs, 1,000 arena episodes): one K=1 run is minutes, not hours; the full seed sweep is
 # 35 arena runs + 12 NYC runs + 36 data-efficiency runs. The slow parts are NYC *collection* (Valdrada, not in this
 # script) and the connectome ablation (18 runs incl. min_syn=1 graphs with ~5x more edges).
 set -euo pipefail
 cd "$(dirname "$0")/.."; mkdir -p logs results/runs
-STAGES=${STAGES:-"seeds hd plan bench ablate"}
+STAGES=${STAGES:-"seeds hd plan bench ablate realvid"}
 export PYTHONPATH=. DEVICE=${DEVICE:-cuda} PY=${PY:-"uv run python"}
 
 # ---- environment -----------------------------------------------------------------------------------------------
@@ -29,6 +30,7 @@ EOF
 export TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
 
 # ---- data -----------------------------------------------------------------------------------------------------
+[ -f data/connectome.npz ] || { [ -f data/raw/proofread_connections_783.feather ] && $PY -m wm2cx.connectome --out data/connectome.npz; }   # rebuild from the FlyWire raw files if only those were copied
 for f in data/connectome.npz data/nav_train.npz data/arrange_train.npz data/nav_test.npz data/arrange_test.npz; do
   [ -f "$f" ] || { echo "missing $f: copy data/ from the M1, or collect the arena here:"; echo "  bash scripts/collect_all.sh  (needs the V-JEPA 2.1 ViT-B weights; ~1,200 episodes)"; exit 1; }
 done
@@ -61,6 +63,22 @@ if stage plan; then                                                             
 fi
 
 stage bench && $PY scripts/bench_latency.py --device "$DEVICE" --conn data/connectome.npz   # Table 3 on the real graph, GPU
+
+if stage realvid; then                                                          # E7: real handheld video (scripts/ingest_video.py), zero-shot + leave-one-clip-out fine-tuning
+  RV=${RV:-data/realvid_all.npz}
+  if [ -f "$RV" ]; then
+    $PY -c "import numpy as np,sys; sys.exit(0 if 'z' in np.load('$RV') else 1)" || $PY scripts/ingest_video.py --from_npz "$RV" --device "$DEVICE"
+    for ck in results/runs/{connectome,connectome_nosign,shuffled,random,gru,dense}_K1_s[0-4].pt; do
+      [ -f "$ck" ] || continue; r=$(basename "$ck" .pt)
+      [ -f results/runs/${r}_realvid.json ] || $PY scripts/eval_ckpt.py --run "$r" --test "$RV" --tag _realvid --device "$DEVICE"
+      [ -f results/runs/${r}_realvid_ft.json ] || $PY scripts/eval_ckpt.py --run "$r" --test "$RV" --tag _realvid_ft --finetune_epochs 10 --device "$DEVICE" --baselines 0
+    done
+    for ck in results/runs/{connectome,shuffled,random,gru}_K1_s[0-2]_nyc.pt; do                                   # NYC-trained students on real streets
+      [ -f "$ck" ] || continue; r=$(basename "$ck" .pt)
+      [ -f results/runs/${r}_realvid.json ] || $PY scripts/eval_ckpt.py --run "$r" --test "$RV" --tag _realvid --device "$DEVICE" --baselines 0
+    done
+  else echo "no $RV: run scripts/ingest_video.py on the laptop and copy it"; fi
+fi
 
 stage ablate && bash scripts/ablate_connectome.sh                                # #13: min_syn x region set x wiring, 3 seeds
 
