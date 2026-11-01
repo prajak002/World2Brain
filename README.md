@@ -220,6 +220,26 @@ Blind controllers take random actions (the scripted policy reads env state, so i
 collisions come from; the oracle planner re-plans after the blackout and absorbs up to 3 blind steps. These are the
 search-side ceilings for E2 on the twin: the student-dynamics rows still need checkpoints trained on twin episodes.
 
+## Issue fixes merged from the M1 branch (2026-11-01; GitHub issues #1-#5, see `PAPER_ISSUES.md`)
+The M1 session fixed issues #1-#5 on `results/nyc-videos-and-benchmarks` while main fixed #6-#13; the two lines are now
+one codebase (main's tooling, the branch's controls and protocol). What changed in the model and protocol:
+
+| issue | fix | where |
+|---|---|---|
+| #1 block structure | `shuffled` is a Maslov-Sneppen switch rewire (exact edge count, every in/out-degree, no self-loops); new `block_shuffled` keeps every (pre-region, post-region) block count | `wm2cx/rewire.py`, `student.build_edges` |
+| #2 signs | every control takes one sign per presynaptic neuron (Dale) with the inhibitory *edge* fraction matched to the real 0.50; new `connectome_randsign` (same softplus parametrisation, permuted neurotransmitter identity) | `student.dale_signs` |
+| #3 parameters | `W_in` feeds the 2,330 VIS neurons only (3.7M total for K=1, 2.5 % recurrent, down from 7.25M with 66 % dead rows); `param_breakdown()` in every run JSON; optional `--in_rank` bottleneck | `student.py`, `train.py` |
+| #4 GRU matching | `--gru_hidden 0` (default) picks the largest GRU with <= the FlyBrain parameter count; both models receive the blackout flag (`--vis_flag`); `--val` carves a validation split for the lr sweep (`aws_h100.sh` stage `lr`); the old 1,400-unit GRU stays as `gru_big` | `student.gru_hidden_for`, `run_seeds.sh` |
+| #5 causal targets | `collect.py --causal 1` (default): the target at step t is the latent of the clip ending at t, so blind-window targets no longer encode the frames the student cannot see (8x teacher cost); `ingest_video.py` does the same; each npz records `meta.causal` and `aws_h100.sh` stage `data` re-collects the arena when the files are non-causal | `scripts/collect.py` |
+| checkpoints | one loader, `wm2cx/ckpt.py`, rebuilds any run (legacy dense-mask / full-W_in checkpoints convert on load) | all eval and video scripts |
+
+Consequence for every table above: they were produced with non-causal targets, the global shuffle and the 7.25M-parameter
+student, and are superseded by the GPU rerun (`scripts/aws_h100.sh`, stages `data lr seeds hd plan bench ablate realvid`).
+Data for the rerun: the FlyWire raw files, `connectome.npz` and the run-1 episode files are on Kaggle
+(`popsensharma/world2brain-flywire-783`, private); the arena is re-collected causally on the GPU box, the NYC Valdrada
+episodes stay as a legacy non-causal set, and the raycast twin (`collect.py --env nyc`) provides a causal NYC set with the
+geographic block split (`split_geo.py`).
+
 ## E7 Real handheld video (2026-11-01, tooling + pilot data)
 `scripts/ingest_video.py` turns unlabeled phone / GoPro footage into wm2cx episodes: centre square crop to 256 px, 2 steps/s,
 egomotion from a 4x4 patch-grid phase correlation (pure numpy) accumulated over 4 sub-frames per step, yaw in degrees via the

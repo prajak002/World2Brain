@@ -6,7 +6,7 @@
 #   git clone https://github.com/prajak002/World2Brain.git && cd World2Brain
 #   # copy data/ from the M1 (connectome.npz, nav_*/arrange_*/nyc_* npz; checkpoints optional):
 #   #   rsync -av m1:~/worldmodel2connectom/data/ data/
-#   STAGES="seeds hd plan bench ablate realvid" bash scripts/aws_h100.sh 2>&1 | tee logs/aws_$(date +%F).log
+#   STAGES="data lr seeds hd plan bench ablate realvid" bash scripts/aws_h100.sh 2>&1 | tee logs/aws_$(date +%F).log
 #   (or from the laptop: scripts/vast_launch.sh, which rents a 4090 on Vast.ai and drives this script over ssh)
 #
 # Rough budget (H100, 20 epochs, 1,000 arena episodes): one K=1 run is minutes, not hours; the full seed sweep is
@@ -14,7 +14,7 @@
 # script) and the connectome ablation (18 runs incl. min_syn=1 graphs with ~5x more edges).
 set -euo pipefail
 cd "$(dirname "$0")/.."; mkdir -p logs results/runs
-STAGES=${STAGES:-"seeds hd plan bench ablate realvid"}
+STAGES=${STAGES:-"data lr seeds hd plan bench ablate realvid"}
 export PYTHONPATH=. DEVICE=${DEVICE:-cuda} PY=${PY:-"uv run python"}
 
 # ---- environment -----------------------------------------------------------------------------------------------
@@ -31,16 +31,32 @@ export TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
 
 # ---- data -----------------------------------------------------------------------------------------------------
 [ -f data/connectome.npz ] || { [ -f data/raw/proofread_connections_783.feather ] && $PY -m wm2cx.connectome --out data/connectome.npz; }   # rebuild from the FlyWire raw files if only those were copied
-for f in data/connectome.npz data/nav_train.npz data/arrange_train.npz data/nav_test.npz data/arrange_test.npz; do
-  [ -f "$f" ] || { echo "missing $f: copy data/ from the M1, or collect the arena here:"; echo "  bash scripts/collect_all.sh  (needs the V-JEPA 2.1 ViT-B weights; ~1,200 episodes)"; exit 1; }
-done
+[ -f data/connectome.npz ] || { echo "missing data/connectome.npz (or data/raw/*.feather to rebuild it)"; exit 1; }
+if stage data; then                                                             # #5: causal teacher targets; the Kaggle npz are the legacy non-causal run-1 data
+  for t in nav arrange; do
+    if [ -f data/${t}_train.npz ] && ! $PY -c "import numpy as np,json,sys; d=np.load('data/${t}_train.npz'); sys.exit(0 if 'meta' in d and json.loads(str(d['meta'])).get('causal') else 1)" 2>/dev/null; then
+      mkdir -p data/legacy; mv data/${t}_train.npz data/${t}_test.npz data/legacy/ 2>/dev/null; echo "moved non-causal ${t} data to data/legacy/"; fi
+    [ -f data/${t}_train.npz ] || $PY scripts/collect.py --task $t --episodes 1000 --seed 0 --device "$DEVICE" --causal 1 --out data/${t}_train.npz
+    [ -f data/${t}_test.npz ]  || $PY scripts/collect.py --task $t --episodes 200 --seed 1 --device "$DEVICE" --causal 1 --out data/${t}_test.npz
+  done
+  if [ ! -f data/nyc_twin_train.npz ]; then                                     # #10: raycast NYC twin, geographic block split
+    $PY scripts/collect.py --env nyc --episodes ${NYC_EPISODES:-600} --seed 0 --device "$DEVICE" --causal 1 --out data/nyc_twin_all.npz
+    $PY scripts/split_geo.py data/nyc_twin_all.npz --out data/nyc_twin --block 120 --margin 40
+  fi
+fi
+for f in data/nav_train.npz data/arrange_train.npz data/nav_test.npz data/arrange_test.npz; do [ -f "$f" ] || { echo "missing $f (run STAGES=data)"; exit 1; }; done
 [ -f data/nyc/midtown_buildings.json ] || bash scripts/fetch_nyc_data.sh         # raycast twin inputs (public, ~1 MB)
 $PY -m pytest tests -q
 
 # ---- stages ---------------------------------------------------------------------------------------------------
 stage() { case " $STAGES " in *" $1 "*) echo; echo "##### $1  $(date +%T)"; return 0;; *) return 1;; esac; }
 
-stage seeds && EPOCHS=${EPOCHS:-20} bash scripts/run_seeds.sh                    # #8 + data-efficiency axis (N_TRAIN)
+if stage lr; then                                                               # #4: per-architecture lr on a validation split, never on test
+  for w in connectome gru dense; do for lr in 5e-4 1e-3 2e-3 4e-3; do
+    [ -f results/runs/${w}_K1_s0_lr${lr}.json ] || $PY scripts/train.py --wiring $w --lr $lr --val 0.15 --epochs 10 --device "$DEVICE" --tag _lr${lr}
+  done; done
+fi
+stage seeds && EPOCHS=${EPOCHS:-20} NYC_TRAIN=${NYC_TRAIN:-data/nyc_twin_train.npz} NYC_TEST=${NYC_TEST:-data/nyc_twin_test.npz} bash scripts/run_seeds.sh   # #8 + data-efficiency axis
 
 if stage hd; then                                                               # #7: actions-only floor + feature-matched subset
   for ck in results/runs/*_K1_s[0-4].pt results/runs/*_K1_s[0-2]_nyc.pt; do

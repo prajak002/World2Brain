@@ -1,13 +1,17 @@
 import argparse, json, time, numpy as np, torch, os
-from wm2cx.student import FlyBrain, GRUBaseline
+from wm2cx.student import FlyBrain, GRUBaseline, gru_hidden_for, WIRINGS
 from wm2cx.data import load_split, blackout, parse_windows, window_errors
 from wm2cx.connectome import load as load_conn
 
 p = argparse.ArgumentParser()
-p.add_argument("--wiring", default="connectome"); p.add_argument("--n_brains", type=int, default=1)
+p.add_argument("--wiring", default="connectome", choices=WIRINGS + ("gru",)); p.add_argument("--n_brains", type=int, default=1)
 p.add_argument("--epochs", type=int, default=30); p.add_argument("--bs", type=int, default=32); p.add_argument("--lr", type=float, default=2e-3)
 p.add_argument("--H", type=int, default=8); p.add_argument("--seed", type=int, default=0); p.add_argument("--device", default="mps")
-p.add_argument("--k", type=int, default=256); p.add_argument("--gru_hidden", type=int, default=0)
+p.add_argument("--k", type=int, default=256)
+p.add_argument("--gru_hidden", type=int, default=0, help="0 = largest hidden size with <= the FlyBrain parameter count of this config (#4)")
+p.add_argument("--vis_flag", type=int, default=1, help="feed the blackout flag to every unit of both FlyBrain and GRU (#4)")
+p.add_argument("--in_rank", type=int, default=0, help="low-rank W_in bottleneck (0 = full); shrinks the shared input layer (#3)")
+p.add_argument("--val", type=float, default=0.0, help="fraction of train episodes held out as a validation split for hyper-parameter selection (never test)")
 p.add_argument("--train", nargs="+", default=["data/nav_train.npz", "data/arrange_train.npz"])
 p.add_argument("--test", nargs="+", default=["data/nav_test.npz", "data/arrange_test.npz"])
 p.add_argument("--conn", default="data/connectome.npz"); p.add_argument("--tag", default="")
@@ -22,14 +26,22 @@ if a.n_train and a.n_train < len(tr["obs"]):
     for i in np.unique(task):                                                        # same fraction from every train file (NAV / ARRANGE)
         idx = np.where(task == i)[0]; n_i = max(1, int(round(a.n_train * len(idx) / len(task)))); keep.append(rng.choice(idx, n_i, replace=False))
     keep = torch.from_numpy(np.sort(np.concatenate(keep))); tr = {k: v[keep] for k, v in tr.items()}
-E, T = tr["obs"].shape[:2]; windows = parse_windows(a.eval_windows, T)
-print(f"train eps {E} test eps {len(te['obs'])} PCA{a.k} explained {lat.explained:.3f}")
+va = None
+if a.val > 0:  # validation split carved from the training episodes (fixed by seed), never from test
+    E0 = len(tr["obs"]); perm = np.random.default_rng(1000 + a.seed).permutation(E0); nv = int(a.val * E0)
+    vi, ti = torch.from_numpy(perm[:nv]), torch.from_numpy(perm[nv:])
+    va = {k: v[vi] for k, v in tr.items()}; tr = {k: v[ti] for k, v in tr.items()}
+    va["z_raw"] = te["z_raw"][:0]  # validation is scored in PCA space only
+E, T = tr["obs"].shape[:2]; windows = parse_windows(a.eval_windows, T); obs_dim = tr["obs"].shape[-1]
+print(f"train eps {E} val eps {0 if va is None else len(va['obs'])} test eps {len(te['obs'])} PCA{a.k} explained {lat.explained:.3f}")
 conn = load_conn(a.conn)
+fly = FlyBrain(conn, obs_dim, a.k, wiring=a.wiring if a.wiring != "gru" else "connectome", n_brains=a.n_brains, seed=a.seed, vis_flag=bool(a.vis_flag), in_rank=a.in_rank)
 if a.wiring == "gru":
-    model = GRUBaseline(tr["obs"].shape[-1], a.k, a.gru_hidden)
+    if a.gru_hidden <= 0: a.gru_hidden = gru_hidden_for(fly.n_params(), obs_dim, a.k, vis_flag=bool(a.vis_flag))
+    model = GRUBaseline(obs_dim, a.k, a.gru_hidden, vis_flag=bool(a.vis_flag)); del fly
 else:
-    model = FlyBrain(conn, tr["obs"].shape[-1], a.k, wiring=a.wiring, n_brains=a.n_brains, seed=a.seed)
-model.to(dev); print("neurons", model.N, "params", model.n_params())
+    model = fly
+model.to(dev); pb = model.param_breakdown(); print("neurons", model.N, "params", pb)
 act_head = torch.nn.Linear(model.N, model.act_dim).to(dev) if a.lambda_act > 0 else None
 params = list(model.parameters()) + (list(act_head.parameters()) if act_head is not None else [])
 opt = torch.optim.AdamW(params, lr=a.lr, weight_decay=1e-4)
@@ -47,12 +59,12 @@ def run_eval(d):
                 obs, act, z = d["obs"][i:i + 64].to(dev), d["act"][i:i + 64].to(dev), d["z"][i:i + 64].to(dev)
                 vis = torch.ones(obs.shape[:2], device=dev); vis[:, t0:t1] = 0
                 zh, _ = model(obs, act, vis)
-                e = window_errors(zh, z, t0, t1, lat, d["z_raw"][i:i + 64].to(dev))
+                e = window_errors(zh, z, t0, t1, lat, d["z_raw"][i:i + 64].to(dev) if len(d["z_raw"]) else None)
                 for k_, v in e.items(): acc[f"{t0}:{t1}"][k_].append(v.cpu())
     model.train(); out = {}
     for w, v in acc.items():
-        mse = torch.cat(v["mse"]); out[w] = dict(mse=mse.mean(0).tolist(), cos=torch.cat(v["cos"]).mean(0).tolist(),
-                                                mse_teacher=torch.cat(v["mse_teacher"]).mean(0).tolist(), per_ep_mse=mse.numpy().round(5).tolist())
+        mse = torch.cat(v["mse"]); out[w] = dict(mse=mse.mean(0).tolist(), cos=torch.cat(v["cos"]).mean(0).tolist(), per_ep_mse=mse.numpy().round(5).tolist(),
+                                                mse_teacher=torch.cat(v["mse_teacher"]).mean(0).tolist() if v["mse_teacher"] else [])
     return out
 
 
@@ -72,14 +84,16 @@ for ep in range(a.epochs):
         tot += loss.item(); n += 1
     sched.step()
     if ep % 5 == 4 or ep == a.epochs - 1:
-        ev = run_eval(te); mse, cs = ev[W0]["mse"], ev[W0]["cos"]
+        ev = run_eval(te); mse, cs = ev[W0]["mse"], ev[W0]["cos"]; rec = dict(ep=ep, loss=tot / n, mse=mse, cos=cs)
+        if va is not None: rec["val_mse"] = float(np.mean(run_eval(va)[W0]["mse"]))
         print(f"ep {ep} loss {tot/n:.4f} test blind-MSE h1 {mse[0]:.4f} h4 {mse[3]:.4f} h8 {mse[-1]:.4f} cos h1 {cs[0]:.3f} h8 {cs[-1]:.3f} "
-              f"teacher-space {np.mean(ev[W0]['mse_teacher']):.4f} {time.time()-t0:.0f}s", flush=True)
-        log.append(dict(ep=ep, loss=tot / n, mse=mse, cos=cs))
+              f"teacher-space {np.mean(ev[W0]['mse_teacher']):.4f}" + (f" val {rec['val_mse']:.4f}" if va is not None else "") + f" {time.time()-t0:.0f}s", flush=True)
+        log.append(rec)
 ev = run_eval(te)
 name = f"{a.wiring}_K{a.n_brains}_s{a.seed}{a.tag}"
 os.makedirs("results/runs", exist_ok=True)
-json.dump(dict(args=vars(a), neurons=model.N, params=model.n_params(), test_mse=ev[W0]["mse"], test_cos=ev[W0]["cos"],
+json.dump(dict(args=vars(a), neurons=model.N, params=model.n_params(), param_breakdown=pb, val_mse=(log[-1].get("val_mse") if va is not None else None),
+               test_mse=ev[W0]["mse"], test_cos=ev[W0]["cos"],
                test_mse_teacher=ev[W0]["mse_teacher"], test_mse_per_ep=ev[W0]["per_ep_mse"], test_windows=ev,
                n_test_episodes=len(te["obs"]), n_train_episodes=int(E), log=log, pca_explained=lat.explained),
           open(f"results/runs/{name}.json", "w"), indent=1)
