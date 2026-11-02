@@ -161,6 +161,18 @@ AO = hd_agg(sets["_mlp"], "blind_actions_only", "heading_err_deg")
 for w in sorted(set().union(*[set(h) for h in H.values()])):
     L.append(f"| {w} | {fmt(H[''], w)} | {fmt(H['_mlp'], w)} | {fmt(AO, w)} | {fmt(H['_b8_24'], w)} | {fmt(H['_b4_24'], w)} | {fmt(P[''], w, 2)} | {fmt(P['_mlp'], w, 2)} | {fmt(P['_b8_24'], w, 2)} | {fmt(P['_b4_24'], w, 2)} |")
 
+gn = load("results/goalnav/*.json")
+if gn:
+    L += ["", "## E10 Goal-vector navigation from a linear readout of the state (success / SPL; blackout = vision cut for k steps from step 6)", "",
+          "The controller turns toward the decoded egocentric goal vector and steps forward; `oracle` = true goal vector (controller ceiling), `random` = random actions.", "",
+          "| wiring | env | readout | seeds | no blackout: success / SPL | blackout 3 | blackout 5 |", "|---|---|---|---|---|---|---|"]
+    byg = {}
+    for n, d in gn.items():
+        m = re.match(r"^(.*)_K1_s(\d+)(_nyc)?$", d["run"]); w = (m.group(1) if m else d["run"])
+        byg.setdefault((w, d["env"], d["readout"]), {}).setdefault(d["blackout"], []).append((d["success"], d["spl"]))
+    for (w, env, ro), bb in sorted(byg.items()):
+        cell = lambda k: (f"{np.mean([x[0] for x in bb[k]]):.2f} / {np.mean([x[1] for x in bb[k]]):.2f}" if k in bb else "-")
+        L.append(f"| {w} | {env} | {ro} | {max(len(v) for v in bb.values())} | {cell(0)} | {cell(3)} | {cell(5)} |")
 L += ["", "## E2 Teacher-free planning (success rate, mean goal distance start -> end)", "",
       "| run | env | task | policy | dynamics | blackout | success | SPL | coll/100 m | dist start | dist end | episodes |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
 fm = lambda d, k, f="{:.2f}": f.format(d[k]) if k in d else "-"

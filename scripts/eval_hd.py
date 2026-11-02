@@ -12,6 +12,10 @@ Controls (#7):
   * `rand@CX`, `rand@EPG`: random neuron subsets of the same size as the CX / EPG populations (is the region special, or its size?).
   * `--probe mlp`: a 2-layer MLP probe instead of ridge, to tell a linear (ring-like) code from a merely non-linear one.
   * `--blind t0:t1` and `--tag`: other dark windows (8:24, 4:24) written to results/hd/<run><tag>.json.
+  * `--test data/realvid_all.npz`: probe on real handheld video, whose heading / position come from continuous egomotion
+    (phase correlation), not from the quantised action record. `--train` defaults to the run's own training split (the
+    heading readout learned in the simulator is read out on real video: transfer); `--train data/realvid_all.npz
+    --split_by_clip` fits it on the first clips of the same file and tests on the last two (in-domain, no episode overlap).
 """
 import argparse, json, numpy as np, torch, os
 from wm2cx.ckpt import load_run
@@ -20,10 +24,17 @@ from wm2cx.data import load_split
 p = argparse.ArgumentParser(); p.add_argument("--run", required=True); p.add_argument("--device", default="mps")
 p.add_argument("--match_n", type=int, default=1400, help="feature-matched subset size (GRU hidden size)"); p.add_argument("--lam", type=float, default=100.0)
 p.add_argument("--blind", default="8:16"); p.add_argument("--probe", default="ridge", choices=["ridge", "mlp"]); p.add_argument("--tag", default="")
+p.add_argument("--test", nargs="*", default=None, help="episode files to probe on (default: the run's test split)")
+p.add_argument("--train", nargs="*", default=None, help="episode files to fit the probe on (default: the run's training split)")
+p.add_argument("--split_by_clip", type=int, default=0, help="--train and --test are the same real-video file: fit on all but the last N clips, test on them")
 a = p.parse_args()
 dev = a.device; model, args, conn, lat = load_run(a.run, device=dev)
-te, _ = load_split(args["test"], lat, with_z=False); tr, _ = load_split(args["train"], lat, with_z=False)   # teacher latents not needed
-TURN = np.pi / 8; STEP = {1: 1.0, 4: -0.6}                      # arena action geometry (wm2cx/env.py ACTIONS)
+te, _ = load_split(a.test or args["test"], lat, with_z=False); tr, _ = load_split(a.train or args["train"], lat, with_z=False)   # teacher latents not needed
+if a.split_by_clip:                                               # real video: episodes overlap within a clip (stride 12), so split by clip
+    clip = np.concatenate([np.load(f)["clip"] for f in a.test]); test_clips = np.unique(clip)[-a.split_by_clip:]; m = np.isin(clip, test_clips)
+    te = {k: v[torch.from_numpy(m)] for k, v in te.items() if torch.is_tensor(v)}; tr = {k: v[torch.from_numpy(~m)] for k, v in tr.items() if torch.is_tensor(v)}
+    print(f"split by clip: {int((~m).sum())} train episodes (clips {np.unique(clip[~m]).tolist()}), {int(m.sum())} test (clips {test_clips.tolist()})")
+TURN = np.pi / 8; STEP = {1: 0.6, 4: -0.36} if "nyc" not in a.run else {1: 3.0, 4: -2.0}   # action geometry: arena step_len 0.6 (wm2cx/env.py), NYC twin 3 m / -2 m
 b0, b1 = (int(x) for x in a.blind.split(":")); T = te["obs"].shape[1]
 
 
