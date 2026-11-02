@@ -98,7 +98,11 @@ if stage plan; then                                                             
   fi
 fi
 
-stage bench && $PY scripts/bench_latency.py --device "$DEVICE" --conn data/connectome.npz   # Table 3 on the real graph, GPU
+if stage bench; then                                                            # Table 3 on the real graph, GPU; GRU at the matched hidden size
+  uv pip install --quiet psutil 2>/dev/null || true
+  GH=$($PY -c "import json; print(json.load(open('results/runs/gru_K1_s0.json'))['args']['gru_hidden'])" 2>/dev/null || echo 1400)
+  $PY scripts/bench_latency.py --device "$DEVICE" --conn data/connectome.npz --gru_hidden "$GH" || echo "bench failed"
+fi
 
 if stage realvid; then                                                          # E7: real handheld video (scripts/ingest_video.py), zero-shot + leave-one-clip-out fine-tuning
   RV=${RV:-data/realvid_all.npz}
