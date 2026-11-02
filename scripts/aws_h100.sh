@@ -87,8 +87,9 @@ if stage plan; then                                                             
     done
   done
   # teacher-rendered goal cost: every planning step encodes n_cand x horizon frames with the ViT teacher (~1 s each), so this rung
-  # runs at a diagnostic budget on NAV only (the search is validated at full budget with oracle dynamics above)
-  P "connectome_K1_s0_nav_mpc_render_teacher" --run connectome_K1_s0 --task nav --dynamics render_teacher --episodes 10 --horizon 6 --iters 2 --n_cand 16 --goal_mode pose
+  # is opt-in (RENDER_TEACHER=1): even at 16 candidates x 6 steps it exceeded 1.5 h per episode on an A5000. The student-rendered rung
+  # (student encoder on ground-truth rollouts) already isolates the goal-cost failure at 1/50 of the cost.
+  [ "${RENDER_TEACHER:-0}" = 1 ] && P "connectome_K1_s0_nav_mpc_render_teacher" --run connectome_K1_s0 --task nav --dynamics render_teacher --episodes 10 --horizon 6 --iters 2 --n_cand 16 --goal_mode pose
   for w in connectome block_shuffled shuffled gru; do P "${w}_K1_s0_nav_mpc" --run ${w}_K1_s0 --task nav --episodes 30 --horizon 8 --iters 3 --n_cand 64 --goal_mode pose; done
   if [ -f results/runs/connectome_K1_s0_nyc.pt ]; then
     for B in 0 1 3 5; do bo=""; [ "$B" != 0 ] && bo="_blackout$B"; P "connectome_K1_s0_nyc_nav_mpc_nyc_clear${bo}_twin" --run connectome_K1_s0_nyc --env nyc --dynamics student --episodes 30 --blackout $B --blackout_trigger fixed --tag _twin; done
@@ -97,7 +98,11 @@ if stage plan; then                                                             
   fi
 fi
 
-stage bench && $PY scripts/bench_latency.py --device "$DEVICE" --conn data/connectome.npz   # Table 3 on the real graph, GPU
+if stage bench; then                                                            # Table 3 on the real graph, GPU; GRU at the matched hidden size
+  uv pip install --quiet psutil 2>/dev/null || true
+  GH=$($PY -c "import json; print(json.load(open('results/runs/gru_K1_s0.json'))['args']['gru_hidden'])" 2>/dev/null || echo 1400)
+  $PY scripts/bench_latency.py --device "$DEVICE" --conn data/connectome.npz --gru_hidden "$GH" || echo "bench failed"
+fi
 
 if stage realvid; then                                                          # E7: real handheld video (scripts/ingest_video.py), zero-shot + leave-one-clip-out fine-tuning
   RV=${RV:-data/realvid_all.npz}

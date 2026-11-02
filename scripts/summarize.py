@@ -13,8 +13,20 @@ def load(pattern):
     return {os.path.basename(f)[:-5]: json.load(open(f)) for f in sorted(glob.glob(pattern)) if "smoke" not in f}
 
 
-def tag_of(name):
-    m = re.match(r"^(.*)_K(\d+)_s(\d+)(.*)$", name); return m.group(4) if m else ""
+VARIANTS = ("_alphagate", "_alpha", "_gate", "_big")     # model variants trained on the same data: shown as extra rows, not as datasets
+
+
+def split_tag(name):
+    """'gru_K1_s0_big' -> ('', '_big'); 'connectome_K1_s0_nyc' -> ('_nyc', ''); 'connectome_K1_s0_gate' -> ('', '_gate')."""
+    m = re.match(r"^(.*)_K(\d+)_s(\d+)(.*)$", name); tag = m.group(4) if m else ""
+    for v in VARIANTS:
+        if tag.endswith(v): return tag[:-len(v)], v
+    return tag, ""
+
+
+def tag_of(name): return split_tag(name)[0]
+def label_of(name, r): return r["args"]["wiring"] + split_tag(name)[1]
+is_lr = lambda n: re.search(r"_lr[0-9.e-]+$", n) is not None               # lr sweep on a validation split: own table
 
 
 def boot_ci(x, stat=np.mean, n=NBOOT):
@@ -36,10 +48,10 @@ def per_ep(r):
 runs, base, hd, plan = load("results/runs/*.json"), load("results/baselines/*.json"), load("results/hd/*.json"), load("results/plan/*.json")
 L = ["# wm2cx results summary", ""]
 is_eff = lambda n: re.search(r"_n(\d+)$", n)                                   # data-efficiency runs (train.py --n_train) get their own table
-tags = sorted({tag_of(n) for n in list(runs) + list(base) if not is_eff(n)}, key=lambda t: (t != "", t))
+tags = sorted({tag_of(n) for n in list(runs) + list(base) if not is_eff(n) and not is_lr(n)}, key=lambda t: (t != "", t))
 for tag in tags:
     ds = "arena (NAV + ARRANGE)" if tag == "" else tag.strip("_").upper()
-    R = {n: r for n, r in runs.items() if tag_of(n) == tag}; Bz = {n: r for n, r in base.items() if tag_of(n) == tag}
+    R = {n: r for n, r in runs.items() if tag_of(n) == tag and not is_lr(n) and not is_eff(n)}; Bz = {n: r for n, r in base.items() if tag_of(n) == tag}
     ref_name = next((n for n in R if n.startswith("connectome_K1_s0")), None); ref = per_ep(R[ref_name]) if ref_name else None
     L += [f"## E1 Blind-horizon latent prediction, {ds} (test; 8 visible, then 1..8 blind steps)", "",
           "MSE in whitened PCA-256 space (students are trained in it) and in the original teacher space (3,840-d ViT-B mean + 2x2 pooled tokens). "
@@ -63,7 +75,7 @@ for tag in tags:
     by = {}
     for n, r in R.items():
         a = r["args"]
-        if a["n_brains"] == 1: by.setdefault(a["wiring"], []).append((np.mean(r["test_mse"]), np.mean(r["test_cos"])))
+        if a["n_brains"] == 1: by.setdefault(label_of(n, r), []).append((np.mean(r["test_mse"]), np.mean(r["test_cos"])))
     L += ["", f"### Wiring comparison, K=1, {ds}: mean over horizons, mean ± sd over seeds (95% t-CI when n ≥ 3)", "",
           "| wiring | seeds | MSE | cos |", "|---|---|---|---|"]
     for w, v in by.items():
@@ -84,6 +96,17 @@ for tag in tags:
             L.append(f"| {n} | " + " | ".join(cells) + " |")
     L.append("")
 
+lrs = {}
+for n, r in runs.items():
+    m = re.search(r"_lr([0-9.e-]+)$", n)
+    if m and r.get("val_mse") is not None: lrs.setdefault(r["args"]["wiring"], {})[m.group(1)] = (r["val_mse"], float(np.mean(r["test_mse"])))
+if lrs:
+    L += ["## Learning-rate selection (10 epochs, 15 % validation split carved from train; the seeds stage uses the lr with the lowest validation MSE, #4)", "",
+          "| wiring | lr | val MSE | test MSE |", "|---|---|---|---|"]
+    for w, d in sorted(lrs.items()):
+        best = min(d, key=lambda k: d[k][0])
+        for k in sorted(d, key=float): L.append(f"| {w} | {k}{' **(selected)**' if k == best else ''} | {d[k][0]:.4f} | {d[k][1]:.4f} |")
+    L.append("")
 L += ["## E4 Multi-brain scaling (connectome, seed 0, arena)", "", "| K | neurons | params | MSE mean | cos mean |", "|---|---|---|---|---|"]
 for n, r in runs.items():
     if r["args"]["wiring"] == "connectome" and r["args"]["seed"] == 0 and tag_of(n) == "":
