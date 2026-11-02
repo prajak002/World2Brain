@@ -13,7 +13,7 @@ def load(pattern):
     return {os.path.basename(f)[:-5]: json.load(open(f)) for f in sorted(glob.glob(pattern)) if "smoke" not in f}
 
 
-VARIANTS = ("_alphagate", "_alpha", "_gate", "_big")     # model variants trained on the same data: shown as extra rows, not as datasets
+VARIANTS = ("_alphagate", "_alpha", "_gate", "_big", "_recmatch")     # model variants trained on the same data: shown as extra rows, not as datasets
 
 
 def split_tag(name):
