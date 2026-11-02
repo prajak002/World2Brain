@@ -68,9 +68,12 @@ export LR_CONN=$(pick_lr connectome 2e-3) LR_DENSE=$(pick_lr dense 1e-3) LR_GRU=
 stage seeds && EPOCHS=${EPOCHS:-20} NYC_TRAIN=${NYC_TRAIN:-data/nyc_twin_train.npz} NYC_TEST=${NYC_TEST:-data/nyc_twin_test.npz} bash scripts/run_seeds.sh   # #8 + data-efficiency axis
 
 if stage hd; then                                                               # #7: actions-only floor + feature-matched subset
-  for ck in results/runs/*_K1_s[0-4].pt results/runs/*_K1_s[0-2]_nyc.pt; do
-    [ -f "$ck" ] || continue; r=$(basename "$ck" .pt); d=""; case "$r" in *_nyc) d="--data data/nyc_test.npz";; esac
-    for b in "" "--blind"; do $PY scripts/eval_hd.py --run "$r" --device "$DEVICE" $d $b --match_n 1400; done
+  # one call per checkpoint evaluates visible and blind (window --blind t0:t1); the feature-matched subset uses the matched GRU's hidden size
+  GH=$($PY -c "import json; print(json.load(open('results/runs/gru_K1_s0.json'))['args']['gru_hidden'])" 2>/dev/null || echo 1400)
+  for ck in results/runs/*_K1_s[0-4].pt results/runs/*_K1_s[0-2]_nyc.pt results/runs/*_K[23]_s0.pt; do
+    [ -f "$ck" ] || continue; r=$(basename "$ck" .pt); case "$r" in *_lr*|*_n[0-9]*) continue;; esac
+    [ -f results/hd/$r.json ] && grep -q actions_only results/hd/$r.json && continue
+    $PY scripts/eval_hd.py --run "$r" --device "$DEVICE" --match_n "$GH" || echo "hd failed: $r"
   done
 fi
 
