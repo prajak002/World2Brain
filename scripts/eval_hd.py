@@ -8,19 +8,14 @@ Controls (#7):
   * `actions+all@1400`: both, to see whether the state adds anything beyond the action record.
 """
 import argparse, json, numpy as np, torch, os
-from wm2cx.student import FlyBrain, GRUBaseline
-from wm2cx.data import load_split, Latents
-from wm2cx.connectome import load as load_conn
+from wm2cx.ckpt import load_run
+from wm2cx.data import load_split
 
 p = argparse.ArgumentParser(); p.add_argument("--run", required=True); p.add_argument("--device", default="mps")
 p.add_argument("--match_n", type=int, default=1400, help="feature-matched subset size (GRU hidden size)"); p.add_argument("--lam", type=float, default=100.0)
 p.add_argument("--blind", default="8:16"); a = p.parse_args()
-dev = a.device; ck = torch.load(f"results/runs/{a.run}.pt", weights_only=False); args = ck["args"]
-conn = load_conn(args["conn"]); lat = Latents.__new__(Latents); lat.mu, lat.P, lat.scale = ck["lat"]["mu"], ck["lat"]["P"], ck["lat"]["scale"]
+dev = a.device; model, args, conn, lat = load_run(a.run, device=dev)
 te, _ = load_split(args["test"], lat); tr, _ = load_split(args["train"], lat)
-if args["wiring"] == "gru": model = GRUBaseline(te["obs"].shape[-1], args["k"], args["gru_hidden"])
-else: model = FlyBrain(conn, te["obs"].shape[-1], args["k"], wiring=args["wiring"], n_brains=args["n_brains"], seed=args["seed"])
-model.load_state_dict(ck["state"]); model.to(dev).eval()
 b0, b1 = (int(x) for x in a.blind.split(":")); T = te["obs"].shape[1]
 
 

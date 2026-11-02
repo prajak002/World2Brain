@@ -33,16 +33,11 @@ eh, ew = 8, 32
 need_model = a.policy == "mpc" and a.dynamics in ("student", "render_student")
 model = lat = teacher = None
 if need_model or a.dynamics == "render_teacher":
-    from wm2cx.student import FlyBrain, GRUBaseline
+    from wm2cx.ckpt import build_model, latents_from
     from wm2cx.connectome import load as load_conn
-    from wm2cx.data import Latents
-    ck = torch.load(f"results/runs/{a.run}.pt", weights_only=False); args = ck["args"]
-    lat = Latents.__new__(Latents); lat.mu, lat.P, lat.scale = ck["lat"]["mu"], ck["lat"]["P"], ck["lat"]["scale"]
+    ck = torch.load(f"results/runs/{a.run}.pt", weights_only=False); args = ck["args"]; lat = latents_from(ck)
     if need_model:
-        conn = load_conn(args["conn"])
-        if args["wiring"] == "gru": model = GRUBaseline(eh * ew * 3, args["k"], args["gru_hidden"])
-        else: model = FlyBrain(conn, eh * ew * 3, args["k"], wiring=args["wiring"], n_brains=args["n_brains"], seed=args["seed"])
-        model.load_state_dict(ck["state"]); model.to(dev).eval()
+        conn = load_conn(args["conn"]); model = build_model(args, conn, eh * ew * 3, ck["state"]); model.load_state_dict(ck["state"]); model.to(dev).eval()
 if a.dynamics == "render_teacher":
     from wm2cx.teacher import VJEPA21Encoder
     teacher = VJEPA21Encoder("vitb", crop=256, frames=16).to(dev)
@@ -57,8 +52,11 @@ def eye(img):
 def encode_frames(imgs, W=None):
     """Latent of a batch of panoramas with the active encoder (student with eyes open, 6 settle steps; or teacher)."""
     if a.dynamics == "render_teacher":
-        clips = torch.from_numpy(np.stack(imgs))[:, None].repeat(1, 16, 1, 1, 1).to(dev)           # static clip
-        z = teacher.per_step_latents(clips)[:, 0].cpu().numpy(); return torch.from_numpy(lat(z)).to(dev)
+        zs = []
+        for i in range(0, len(imgs), 8):                                                            # chunked: 64 clips x 16 frames OOMs a 24 GB card
+            clips = torch.from_numpy(np.stack(imgs[i:i + 8]))[:, None].repeat(1, 16, 1, 1, 1).to(dev)   # static clip
+            zs.append(teacher.per_step_latents(clips)[:, 0].cpu().numpy())
+        return torch.from_numpy(lat(np.concatenate(zs))).to(dev)
     o = torch.stack([eye(i) for i in imgs]); h = model.init_state(len(imgs), dev); W = model.edge_weights() if W is None else W
     for _ in range(6): h = model.step(h, o, torch.zeros(len(imgs), dtype=torch.long, device=dev), torch.ones(len(imgs), device=dev), W)
     return model.W_out(h)
