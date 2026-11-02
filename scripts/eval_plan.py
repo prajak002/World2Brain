@@ -52,8 +52,11 @@ def eye(img):
 def encode_frames(imgs, W=None):
     """Latent of a batch of panoramas with the active encoder (student with eyes open, 6 settle steps; or teacher)."""
     if a.dynamics == "render_teacher":
-        clips = torch.from_numpy(np.stack(imgs))[:, None].repeat(1, 16, 1, 1, 1).to(dev)           # static clip
-        z = teacher.per_step_latents(clips)[:, 0].cpu().numpy(); return torch.from_numpy(lat(z)).to(dev)
+        zs = []
+        for i in range(0, len(imgs), 8):                                                            # chunked: 64 clips x 16 frames OOMs a 24 GB card
+            clips = torch.from_numpy(np.stack(imgs[i:i + 8]))[:, None].repeat(1, 16, 1, 1, 1).to(dev)   # static clip
+            zs.append(teacher.per_step_latents(clips)[:, 0].cpu().numpy())
+        return torch.from_numpy(lat(np.concatenate(zs))).to(dev)
     o = torch.stack([eye(i) for i in imgs]); h = model.init_state(len(imgs), dev); W = model.edge_weights() if W is None else W
     for _ in range(6): h = model.step(h, o, torch.zeros(len(imgs), dtype=torch.long, device=dev), torch.ones(len(imgs), device=dev), W)
     return model.W_out(h)
