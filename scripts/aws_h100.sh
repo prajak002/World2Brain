@@ -82,6 +82,7 @@ if stage plan; then                                                             
   for dyn in oracle render_student student; do
     for task in nav arrange; do
       sfx=""; [ "$dyn" != student ] && sfx="_$dyn"
+      [ "$dyn" = render_student ] && [ "$task" = arrange ] && continue      # ARRANGE fails even with oracle dynamics (3 %): the render rungs are uninformative there and cost ~70 min each
       P "connectome_K1_s0_${task}_mpc${sfx}" --run connectome_K1_s0 --task $task --dynamics $dyn --episodes 30 --horizon 8 --iters 3 --n_cand 64 --goal_mode pose
     done
   done
