@@ -168,7 +168,7 @@ while done < a.episodes:
         step_out = env.step(ac) if a.env == "arena" else env.step(ac, render=visible or t + 1 < a.t_vis)
         img = step_out[0] if step_out[0] is not None else img
         # dead reckoning of the discrete action in the start frame (ideal integrator of the action record)
-        d_fwd = {0: 0.0, 1: (1.0 if a.env == "arena" else 3.0), 4: (-0.6 if a.env == "arena" else -2.0)}.get(ac, 0.0); d_th = {2: TURN, 3: -TURN}.get(ac, 0.0)
+        d_fwd = {0: 0.0, 1: (0.6 if a.env == "arena" else 3.0), 4: (-0.36 if a.env == "arena" else -2.0)}.get(ac, 0.0)   # arena step_len 0.6; d_th = {2: TURN, 3: -TURN}.get(ac, 0.0)
         dr_th += d_th; dr_pos += d_fwd * np.array([np.cos(dr_th), np.sin(dr_th)])
         if not visible: path += float(np.linalg.norm(env.pos - before))
         prev = torch.tensor([ac], device=dev)
