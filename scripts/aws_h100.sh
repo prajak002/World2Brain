@@ -78,15 +78,18 @@ if stage hd; then                                                               
 fi
 
 if stage plan; then                                                             # #9: the full ladder on the arena, then the twin
+  P() { local out=$1; shift; [ -f "results/plan/$out.json" ] && { echo "skip plan $out"; return 0; }; $PY scripts/eval_plan.py "$@" --device "$DEVICE" || echo "plan failed: $out"; }
   for dyn in oracle render_teacher render_student student; do
     for task in nav arrange; do
-      $PY scripts/eval_plan.py --run connectome_K1_s0 --task $task --dynamics $dyn --device "$DEVICE" --episodes 30 --horizon 8 --iters 3 --n_cand 64 --goal_mode pose
+      sfx=""; [ "$dyn" != student ] && sfx="_$dyn"
+      P "connectome_K1_s0_${task}_mpc${sfx}" --run connectome_K1_s0 --task $task --dynamics $dyn --episodes 30 --horizon 8 --iters 3 --n_cand 64 --goal_mode pose
     done
   done
-  for w in connectome shuffled gru; do $PY scripts/eval_plan.py --run ${w}_K1_s0 --task nav --device "$DEVICE" --episodes 30 --horizon 8 --iters 3 --n_cand 64 --goal_mode pose; done
+  for w in connectome block_shuffled shuffled gru; do P "${w}_K1_s0_nav_mpc" --run ${w}_K1_s0 --task nav --episodes 30 --horizon 8 --iters 3 --n_cand 64 --goal_mode pose; done
   if [ -f results/runs/connectome_K1_s0_nyc.pt ]; then
-    for B in 0 1 3 5; do $PY scripts/eval_plan.py --run connectome_K1_s0_nyc --env nyc --dynamics student --device "$DEVICE" --episodes 30 --blackout $B --blackout_trigger fixed --tag _twin; done
-    for app in overcast fog dusk night; do $PY scripts/eval_plan.py --run connectome_K1_s0_nyc --env nyc --dynamics student --device "$DEVICE" --episodes 30 --appearance $app --tag _twin; done
+    for B in 0 1 3 5; do bo=""; [ "$B" != 0 ] && bo="_blackout$B"; P "connectome_K1_s0_nyc_nav_mpc_nyc_clear${bo}_twin" --run connectome_K1_s0_nyc --env nyc --dynamics student --episodes 30 --blackout $B --blackout_trigger fixed --tag _twin; done
+    for app in overcast fog dusk night; do P "connectome_K1_s0_nyc_nav_mpc_nyc_${app}_twin" --run connectome_K1_s0_nyc --env nyc --dynamics student --episodes 30 --appearance $app --tag _twin; done
+    for w in gru block_shuffled; do P "${w}_K1_s0_nyc_nav_mpc_nyc_clear_twin" --run ${w}_K1_s0_nyc --env nyc --dynamics student --episodes 30 --tag _twin; done
   fi
 fi
 
