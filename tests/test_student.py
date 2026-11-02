@@ -141,3 +141,14 @@ def test_step_accepts_precomputed_edge_weights_and_dense_matrix():
     h = torch.randn(2, m.N); obs = torch.randn(2, 24); act = torch.zeros(2, dtype=torch.long); vis = torch.ones(2)
     a = m.step(h, obs, act, vis); b = m.step(h, obs, act, vis, m.edge_weights()); c = m.step(h, obs, act, vis, m.W())
     assert torch.allclose(a, b) and torch.allclose(a, c, atol=1e-5)
+
+
+@pytest.mark.parametrize("kw", [dict(learn_alpha=True), dict(gate=True), dict(learn_alpha=True, gate=True)])
+def test_neuron_model_ablations_run_and_train(kw):
+    conn = small_conn(); m = FlyBrain(conn, 24, 8, wiring="connectome", seed=3, **kw)
+    x = torch.randn(2, 5, 24); a = torch.randint(0, 5, (2, 5)); v = torch.ones(2, 5); v[:, 2:4] = 0
+    zh, H = m(x, a, v); assert zh.shape == (2, 5, 8) and torch.isfinite(H).all()
+    zh.pow(2).sum().backward()
+    if kw.get("gate"): assert m.Wg_raw.grad is not None and m.Wg_raw.grad.abs().sum() > 0 and m.param_breakdown()["recurrent"] == 2 * m.n_edges
+    if kw.get("learn_alpha") and not kw.get("gate"): assert m.alpha_logit.grad is not None
+    base = FlyBrain(conn, 24, 8, wiring="connectome", seed=3); assert m.n_edges == base.n_edges   # wiring unchanged

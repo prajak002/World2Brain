@@ -17,7 +17,7 @@ def build_model(args, conn, obs_dim=OBS_DIM, state=None):
         return GRUBaseline(obs_dim, args["k"], args["gru_hidden"], vis_flag=vis_flag)
     vis_flag = bool(args.get("vis_flag", state is None or "w_vis" in state))
     return FlyBrain(conn, obs_dim, args["k"], wiring=args["wiring"], n_brains=args["n_brains"], seed=args["seed"],
-                    vis_flag=vis_flag, in_rank=int(args.get("in_rank", 0)))
+                    vis_flag=vis_flag, in_rank=int(args.get("in_rank", 0)), learn_alpha=bool(args.get("learn_alpha", 0)), gate=bool(args.get("gate", 0)))
 
 
 def latents_from(ck):

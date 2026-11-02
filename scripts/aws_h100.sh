@@ -14,7 +14,7 @@
 # script) and the connectome ablation (18 runs incl. min_syn=1 graphs with ~5x more edges).
 set -euo pipefail
 cd "$(dirname "$0")/.."; mkdir -p logs results/runs
-STAGES=${STAGES:-"data lr seeds hd plan bench ablate realvid"}
+STAGES=${STAGES:-"data lr seeds hd plan bench arch ablate realvid"}
 export PYTHONPATH=. DEVICE=${DEVICE:-cuda} PY=${PY:-"uv run python"}
 stage() { case " $STAGES " in *" $1 "*) echo; echo "##### $1  $(date +%T)"; return 0;; *) return 1;; esac; }
 
@@ -103,6 +103,16 @@ if stage realvid; then                                                          
       [ -f results/runs/${r}_realvid.json ] || $PY scripts/eval_ckpt.py --run "$r" --test "$RV" --tag _realvid --device "$DEVICE" --baselines 0
     done
   else echo "no $RV: run scripts/ingest_video.py on the laptop and copy it"; fi
+fi
+
+if stage arch; then                                                             # neuron-model ablation, wiring fixed: is the GRU gap the unit model or the graph?
+  for s in 0 1 2; do for w in connectome block_shuffled random; do
+    [ -f results/runs/${w}_K1_s${s}_alpha.json ]     || $PY scripts/train.py --wiring $w --seed $s --epochs 20 --device "$DEVICE" --lr $LR_CONN --learn_alpha 1 --tag _alpha
+    [ -f results/runs/${w}_K1_s${s}_gate.json ]      || $PY scripts/train.py --wiring $w --seed $s --epochs 20 --device "$DEVICE" --lr $LR_CONN --gate 1 --tag _gate
+    [ -f results/runs/${w}_K1_s${s}_alphagate.json ] || $PY scripts/train.py --wiring $w --seed $s --epochs 20 --device "$DEVICE" --lr $LR_CONN --learn_alpha 1 --gate 1 --tag _alphagate
+  done
+  [ -f results/runs/gru_K1_s${s}_gate.json ] || $PY scripts/train.py --wiring gru --seed $s --epochs 20 --device "$DEVICE" --lr $LR_GRU --gate 1 --tag _gate   # GRU matched to the gated FlyBrain's parameter count
+  done
 fi
 
 stage ablate && bash scripts/ablate_connectome.sh                                # #13: min_syn x region set x wiring, 3 seeds
