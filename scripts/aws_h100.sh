@@ -79,12 +79,15 @@ fi
 
 if stage plan; then                                                             # #9: the full ladder on the arena, then the twin
   P() { local out=$1; shift; [ -f "results/plan/$out.json" ] && { echo "skip plan $out"; return 0; }; $PY scripts/eval_plan.py "$@" --device "$DEVICE" || echo "plan failed: $out"; }
-  for dyn in oracle render_teacher render_student student; do
+  for dyn in oracle render_student student; do
     for task in nav arrange; do
       sfx=""; [ "$dyn" != student ] && sfx="_$dyn"
       P "connectome_K1_s0_${task}_mpc${sfx}" --run connectome_K1_s0 --task $task --dynamics $dyn --episodes 30 --horizon 8 --iters 3 --n_cand 64 --goal_mode pose
     done
   done
+  # teacher-rendered goal cost: every planning step encodes n_cand x horizon frames with the ViT teacher (~1 s each), so this rung
+  # runs at a diagnostic budget on NAV only (the search is validated at full budget with oracle dynamics above)
+  P "connectome_K1_s0_nav_mpc_render_teacher" --run connectome_K1_s0 --task nav --dynamics render_teacher --episodes 10 --horizon 6 --iters 2 --n_cand 16 --goal_mode pose
   for w in connectome block_shuffled shuffled gru; do P "${w}_K1_s0_nav_mpc" --run ${w}_K1_s0 --task nav --episodes 30 --horizon 8 --iters 3 --n_cand 64 --goal_mode pose; done
   if [ -f results/runs/connectome_K1_s0_nyc.pt ]; then
     for B in 0 1 3 5; do bo=""; [ "$B" != 0 ] && bo="_blackout$B"; P "connectome_K1_s0_nyc_nav_mpc_nyc_clear${bo}_twin" --run connectome_K1_s0_nyc --env nyc --dynamics student --episodes 30 --blackout $B --blackout_trigger fixed --tag _twin; done
