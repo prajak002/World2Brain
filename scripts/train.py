@@ -11,6 +11,8 @@ p.add_argument("--k", type=int, default=256)
 p.add_argument("--gru_hidden", type=int, default=0, help="0 = largest hidden size with <= the FlyBrain parameter count of this config (#4)")
 p.add_argument("--vis_flag", type=int, default=1, help="feed the blackout flag to every unit of both FlyBrain and GRU (#4)")
 p.add_argument("--in_rank", type=int, default=0, help="low-rank W_in bottleneck (0 = full); shrinks the shared input layer (#3)")
+p.add_argument("--learn_alpha", type=int, default=0, help="neuron-model ablation: per-neuron learnable time constant (wiring fixed)")
+p.add_argument("--gate", type=int, default=0, help="neuron-model ablation: GRU-style update gate on a second weight per connectome edge (wiring fixed)")
 p.add_argument("--val", type=float, default=0.0, help="fraction of train episodes held out as a validation split for hyper-parameter selection (never test)")
 p.add_argument("--train", nargs="+", default=["data/nav_train.npz", "data/arrange_train.npz"])
 p.add_argument("--test", nargs="+", default=["data/nav_test.npz", "data/arrange_test.npz"])
@@ -35,7 +37,8 @@ if a.val > 0:  # validation split carved from the training episodes (fixed by se
 E, T = tr["obs"].shape[:2]; windows = parse_windows(a.eval_windows, T); obs_dim = tr["obs"].shape[-1]
 print(f"train eps {E} val eps {0 if va is None else len(va['obs'])} test eps {len(te['obs'])} PCA{a.k} explained {lat.explained:.3f}")
 conn = load_conn(a.conn)
-fly = FlyBrain(conn, obs_dim, a.k, wiring=a.wiring if a.wiring != "gru" else "connectome", n_brains=a.n_brains, seed=a.seed, vis_flag=bool(a.vis_flag), in_rank=a.in_rank)
+fly = FlyBrain(conn, obs_dim, a.k, wiring=a.wiring if a.wiring != "gru" else "connectome", n_brains=a.n_brains, seed=a.seed, vis_flag=bool(a.vis_flag), in_rank=a.in_rank,
+               learn_alpha=bool(a.learn_alpha), gate=bool(a.gate))
 if a.wiring == "gru":
     if a.gru_hidden <= 0: a.gru_hidden = gru_hidden_for(fly.n_params(), obs_dim, a.k, vis_flag=bool(a.vis_flag))
     model = GRUBaseline(obs_dim, a.k, a.gru_hidden, vis_flag=bool(a.vis_flag)); del fly

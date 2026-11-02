@@ -83,7 +83,10 @@ def block_counts(post, pre, region):
 
 class FlyBrain(nn.Module):
     def __init__(self, conn, obs_dim, z_dim, act_dim=5, wiring="connectome", n_brains=1, alpha=0.5, seed=0, signed=None,
-                 vis_flag=True, in_rank=0, edges=None):
+                 vis_flag=True, in_rank=0, edges=None, learn_alpha=False, gate=False):
+        """Neuron-model ablation (wiring fixed): learn_alpha = per-neuron learnable time constant alpha_i = sigmoid(a_i);
+        gate = GRU-style update gate g_i = sigmoid(gain_g (W_g h + W_in_g o + b_g)) carried on a second (unsigned) weight per
+        connectome edge and a second VIS input map, so h <- (1-g) h + g tanh(...). Both keep the edge list fixed."""
         super().__init__()
         N, post, pre, sign = build_edges(conn, wiring, n_brains, seed) if edges is None else edges
         self.N = N; self.alpha = alpha; self.wiring = wiring; self.act_dim = act_dim
@@ -108,6 +111,12 @@ class FlyBrain(nn.Module):
         self.w_vis = nn.Parameter(torch.zeros(N)) if vis_flag else None
         self.b = nn.Parameter(torch.zeros(N)); self.gain = nn.Parameter(torch.ones(N))
         self.W_out = nn.Linear(N, z_dim)
+        self.learn_alpha = learn_alpha; self.gate = gate
+        if learn_alpha: self.alpha_logit = nn.Parameter(torch.full((N,), float(np.log(alpha / (1 - alpha)))))
+        if gate:
+            if self.dense: self.Wg_raw = nn.Parameter(torch.randn(N, N, generator=g) / float(N) ** 0.5 * 0.8)
+            else: self.Wg_raw = nn.Parameter(torch.randn(self.n_edges, generator=g) / indeg[self.e_post].sqrt() * 0.8)
+            self.W_in_g = nn.Linear(obs_dim, nv); self.b_g = nn.Parameter(torch.zeros(N)); self.gain_g = nn.Parameter(torch.ones(N))
 
     # ---------------- weights ----------------
     def edge_weights(self):
@@ -132,7 +141,8 @@ class FlyBrain(nn.Module):
     def n_params(self): return sum(p.numel() for p in self.parameters())
 
     def param_breakdown(self):
-        rec = self.W_raw.numel(); inp = sum(p.numel() for p in self.W_in.parameters()) + self.W_act.weight.numel()
+        rec = self.W_raw.numel() + (self.Wg_raw.numel() if self.gate else 0)
+        inp = sum(p.numel() for p in self.W_in.parameters()) + self.W_act.weight.numel() + (sum(p.numel() for p in self.W_in_g.parameters()) if self.gate else 0)
         out = sum(p.numel() for p in self.W_out.parameters())
         return dict(recurrent=rec, input=inp, output=out, other=self.n_params() - rec - inp - out, total=self.n_params(), edges=self.n_edges)
 
@@ -152,7 +162,12 @@ class FlyBrain(nn.Module):
         inp = inp + self.W_act(F.one_hot(act, self.act_dim).float()) * self.act_mask
         if self.w_vis is not None: inp = inp + self.w_vis * (1 - visible)[:, None]
         pre = self.recur(h, w) + inp + self.b
-        return (1 - self.alpha) * h + self.alpha * torch.tanh(self.gain * pre)
+        if self.gate:
+            gi = torch.zeros_like(h).index_add_(1, self.vis_idx, self.W_in_g(obs) * visible[:, None])
+            a = torch.sigmoid(self.gain_g * (self.recur(h, self.Wg_raw) + gi + self.b_g))
+        elif self.learn_alpha: a = torch.sigmoid(self.alpha_logit)
+        else: a = self.alpha
+        return (1 - a) * h + a * torch.tanh(self.gain * pre)
 
     def forward(self, obs, act, visible, h=None):
         """obs [B,T,D], act [B,T] (action taken after observing step t), visible [B,T] -> z_hat [B,T,z], H [B,T,N]"""
