@@ -28,6 +28,7 @@ class VJEPA21Encoder(nn.Module):
                            num_attention_heads=c["num_attention_heads"], crop_size=crop, frames_per_clip=frames,
                            tubelet_size=c["tubelet_size"], patch_size=c["patch_size"], mlp_ratio=c["mlp_ratio"],
                            layer_norm_eps=c["layer_norm_eps"])
+        cfg._attn_implementation = getattr(cfg, "_attn_implementation", None) or "sdpa"   # transformers >= 4.5x leaves it None on a bare config
         self.enc = VJEPA2Encoder(cfg)
         sd = load_file(hf_hub_download(repo, "model.safetensors"))
         enc = {k[len("encoder."):]: v for k, v in sd.items() if k.startswith("encoder.")}
