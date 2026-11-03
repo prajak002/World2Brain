@@ -1,0 +1,16 @@
+{
+ "run": "connectome_nosign_K1_s2",
+ "env": "arena",
+ "readout": "state",
+ "blackout": 0,
+ "blackout_at": 6,
+ "steps": 24,
+ "episodes": 50,
+ "tol_deg": 45.0,
+ "max_turns": 8,
+ "fit_rollouts": 200,
+ "success": 0.22,
+ "spl": 0.12447463616255693,
+ "dist_start": 5.327812654407783,
+ "dist_final": 5.648147007879801
+}

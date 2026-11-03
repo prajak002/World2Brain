@@ -1,0 +1,16 @@
+{
+ "run": "connectome_K1_s2",
+ "env": "arena",
+ "readout": "state",
+ "blackout": 5,
+ "blackout_at": 6,
+ "steps": 24,
+ "episodes": 50,
+ "tol_deg": 45.0,
+ "max_turns": 8,
+ "fit_rollouts": 200,
+ "success": 0.22,
+ "spl": 0.15126700820101763,
+ "dist_start": 5.327812654407783,
+ "dist_final": 5.835194719499251
+}

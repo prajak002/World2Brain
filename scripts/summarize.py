@@ -123,18 +123,60 @@ if eff:
     for n_ in sorted(eff):
         cells = [(f"{np.mean(v):.4f} ± {np.std(v, ddof=1) if len(v) > 1 else 0:.4f} [{len(v)}]" if (v := eff[n_].get(w)) else "-") for w in ws]
         L.append(f"| {n_} | " + " | ".join(cells) + " |")
-L += ["", "## E3 Head-direction / position linear probes (median heading error, deg; R² in brackets)", "",
-      "`actions only`: ridge on cumulative one-hot actions, no neural state (a leaky integrator of discrete turns exposes relative heading "
-      "linearly, so this is the floor any recurrent state must beat, #7). `all@1400`: random 1,400-neuron subset, feature count matched to the GRU.", "",
-      "| run | actions only (blind) | vis all | blind all | blind all@1400 | vis EPG | blind EPG | vis CX | blind CX | blind pos R² (all) |", "|---|---|---|---|---|---|---|---|---|---|"]
+HD_TAGS = ("_mlp", "_b8_24", "_b4_24")
+def hd_split(n):
+    for t in HD_TAGS:
+        if n.endswith(t): return n[:-len(t)], t
+    return n, ""
+def hd_wiring(run):
+    m = re.match(r"^(.*)_K1_s(\d+)(_nyc)?$", run); return (m.group(1) + (m.group(3) or ""), int(m.group(2))) if m else (None, None)
+hd_base = {n: d for n, d in hd.items() if hd_split(n)[1] == ""}
 g = lambda d, k: f"{d[k]['heading_err_deg']:.1f} ({d[k]['heading_r2']:.2f})" if k in d else "-"
-for n, d in hd.items():
-    L.append(f"| {n} | {g(d,'blind_actions_only')} | {g(d,'vis_all')} | {g(d,'blind_all')} | {g(d,'blind_all@1400')} | {g(d,'vis_EPG')} | {g(d,'blind_EPG')} | {g(d,'vis_CX')} | {g(d,'blind_CX')} | {d['blind_all']['pos_r2']:.2f} |")
+gp = lambda d, k: f"{d[k]['pos_r2']:.2f}" if k in d else "-"
+L += ["", "## E3 Head-direction / position probes (blind window 8:16; median heading error, deg; R² in brackets)", "",
+      "`integrator`: closed-form integration of the nominal action record (heading exact with fixed-angle turns; position by dead reckoning, no fit): "
+      "the information ceiling for the dark window. A probe therefore measures how much of that integral the *state* keeps in a readable code, not whether "
+      "the information exists. `actions only`: ridge on cumulative one-hot actions (the linear floor; an MLP on the same six numbers is near-exact, see below). "
+      "`all@N`: random N-neuron subset, N = matched GRU hidden size. `rand@CX`: random subset the size of CX (is the region special, or its size?).", "",
+      "| run | integrator pos R² | actions only | blind all | blind all@N | blind CX | blind rand@CX | blind EPG | blind rand@EPG | blind pos R² all / CX / rand@CX |",
+      "|---|---|---|---|---|---|---|---|---|---|"]
+for n, d in hd_base.items():
+    gh = next((k for k in d if k.startswith("blind_all@")), None)
+    L.append(f"| {n} | {gp(d,'blind_actions_integrated')} | {g(d,'blind_actions_only')} | {g(d,'blind_all')} | {g(d, gh) if gh else '-'} | {g(d,'blind_CX')} | {g(d,'blind_rand@CX')} | "
+             f"{g(d,'blind_EPG')} | {g(d,'blind_rand@EPG')} | {gp(d,'blind_all')} / {gp(d,'blind_CX')} / {gp(d,'blind_rand@CX')} |")
+# per-wiring aggregate over seeds, per dark window and probe
+def hd_agg(sel, key, field):
+    by = {}
+    for n, d in sel.items():
+        w, sd_ = hd_wiring(hd_split(n)[0])
+        if w and key in d: by.setdefault(w, []).append(d[key][field])
+    return {w: (np.mean(v), np.std(v, ddof=1) if len(v) > 1 else 0.0, len(v)) for w, v in by.items()}
+fmt = lambda a, w, nd=1: f"{a[w][0]:.{nd}f} ± {a[w][1]:.{nd}f} [{a[w][2]}]" if w in a else "-"
+L += ["", "### Blind-window decoding by wiring (mean ± sd over seeds [n]): linear (ridge) vs MLP probe, and longer dark windows", "",
+      "| wiring | heading err 8:16 ridge | heading err 8:16 MLP | actions-only MLP | heading err 8:24 | heading err 4:24 | pos R² 8:16 ridge | pos R² 8:16 MLP | pos R² 8:24 | pos R² 4:24 |",
+      "|---|---|---|---|---|---|---|---|---|---|"]
+sets = {t: {n: d for n, d in hd.items() if hd_split(n)[1] == t} for t in ("",) + HD_TAGS}
+H = {t: hd_agg(sets[t], "blind_all", "heading_err_deg") for t in sets}; P = {t: hd_agg(sets[t], "blind_all", "pos_r2") for t in sets}
+AO = hd_agg(sets["_mlp"], "blind_actions_only", "heading_err_deg")
+for w in sorted(set().union(*[set(h) for h in H.values()])):
+    L.append(f"| {w} | {fmt(H[''], w)} | {fmt(H['_mlp'], w)} | {fmt(AO, w)} | {fmt(H['_b8_24'], w)} | {fmt(H['_b4_24'], w)} | {fmt(P[''], w, 2)} | {fmt(P['_mlp'], w, 2)} | {fmt(P['_b8_24'], w, 2)} | {fmt(P['_b4_24'], w, 2)} |")
 
+gn = load("results/goalnav/*.json")
+if gn:
+    L += ["", "## E10 Goal-vector navigation from a linear readout of the state (success / SPL; blackout = vision cut for k steps from step 6)", "",
+          "The controller turns toward the decoded egocentric goal vector and steps forward; `oracle` = true goal vector (controller ceiling), `random` = random actions.", "",
+          "| wiring | env | readout | seeds | no blackout: success / SPL | blackout 3 | blackout 5 |", "|---|---|---|---|---|---|---|"]
+    byg = {}
+    for n, d in gn.items():
+        m = re.match(r"^(.*)_K1_s(\d+)(_nyc)?$", d["run"]); w = (m.group(1) if m else d["run"])
+        byg.setdefault((w, d["env"], d["readout"]), {}).setdefault(d["blackout"], []).append((d["success"], d["spl"]))
+    for (w, env, ro), bb in sorted(byg.items()):
+        cell = lambda k: (f"{np.mean([x[0] for x in bb[k]]):.2f} / {np.mean([x[1] for x in bb[k]]):.2f}" if k in bb else "-")
+        L.append(f"| {w} | {env} | {ro} | {max(len(v) for v in bb.values())} | {cell(0)} | {cell(3)} | {cell(5)} |")
 L += ["", "## E2 Teacher-free planning (success rate, mean goal distance start -> end)", "",
       "| run | env | task | policy | dynamics | blackout | success | SPL | coll/100 m | dist start | dist end | episodes |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
 fm = lambda d, k, f="{:.2f}": f.format(d[k]) if k in d else "-"
 for n, d in plan.items():
     env = d.get("env", "arena") + (f" ({d['appearance']})" if d.get("appearance", "clear") != "clear" else "") + (" twin" if n.endswith("_twin") else "")
-    L.append(f"| {d['run']} | {env} | {d['task']} | {d['policy']} | {d.get('dynamics', 'student')} | {d.get('blackout', 0)} | {d['success']:.2f} | {fm(d, 'spl')} | {fm(d, 'collisions_per_100m', '{:.1f}')} | {d['dist_start']:.2f} | {d['dist_end']:.2f} | {d['episodes']} |")
+    L.append(f"| {d['run']} | {env} | {d['task']} | {d['policy']} | {d.get('dynamics', 'student')} | {d.get('blackout', 0)} | {d['success']:.2f} | {fm(d, 'spl')} | {fm(d, 'collisions_per_100m', '{:.1f}') if d.get('collisions_per_100m', 0) < 1000 else '-'} | {d['dist_start']:.2f} | {d['dist_end']:.2f} | {d['episodes']} |")
 open("results/summary.md", "w", encoding="utf-8").write("\n".join(L) + "\n"); print("\n".join(L).encode("ascii", "replace").decode())

@@ -20,20 +20,23 @@ class Latents:
         return y * float(self.scale) @ P.T + mu
 
 
-def load_split(paths, lat=None, k=256, keep_raw=False):
+def load_split(paths, lat=None, k=256, keep_raw=False, with_z=True):
     """Concatenate episode files. `keep_raw=True` also returns the un-projected teacher latents (`z_raw`, float16)
-    so errors can be reported in the original teacher space, not only in whitened PCA space (#6)."""
+    so errors can be reported in the original teacher space, not only in whitened PCA space (#6).
+    `with_z=False` skips the teacher latents entirely (behavioural evaluations that only need obs/act/pose): decompressing
+    and projecting them is the dominant cost of loading a split, minutes on a box whose BLAS threads are oversubscribed."""
     ds = [np.load(p) for p in paths]
     obs = np.concatenate([d["obs"] for d in ds]).astype(np.float32) / 255.0  # [E,T,eh,ew,3]
     obs = obs.reshape(obs.shape[0], obs.shape[1], -1)
     act = np.concatenate([d["act"] for d in ds]).astype(np.int64)
-    z = np.concatenate([d["z"] for d in ds])
-    lat = Latents(z, k) if lat is None else lat
-    out = dict(obs=torch.from_numpy(obs), act=torch.from_numpy(act), z=torch.from_numpy(lat(z)).float(),
+    if with_z:
+        z = np.concatenate([d["z"] for d in ds])
+        lat = Latents(z, k) if lat is None else lat
+    out = dict(obs=torch.from_numpy(obs), act=torch.from_numpy(act), z=torch.from_numpy(lat(z)).float() if with_z else None,
                heading=torch.from_numpy(np.concatenate([d["heading"] for d in ds])).float(),
                pos=torch.from_numpy(np.concatenate([d["pos"] for d in ds])).float(),
                task=torch.from_numpy(np.concatenate([np.full(len(d["obs"]), i) for i, d in enumerate(ds)])))
-    if keep_raw: out["z_raw"] = torch.from_numpy(np.ascontiguousarray(z.astype(np.float16)))
+    if keep_raw and with_z: out["z_raw"] = torch.from_numpy(np.ascontiguousarray(z.astype(np.float16)))
     return out, lat
 
 

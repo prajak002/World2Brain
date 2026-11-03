@@ -1,0 +1,16 @@
+{
+ "run": "gru_K1_s0",
+ "env": "arena",
+ "readout": "mlp",
+ "blackout": 0,
+ "blackout_at": 6,
+ "steps": 24,
+ "episodes": 50,
+ "tol_deg": 45.0,
+ "max_turns": 8,
+ "fit_rollouts": 200,
+ "success": 0.2,
+ "spl": 0.16119822620206134,
+ "dist_start": 5.327812654407783,
+ "dist_final": 5.761958824427644
+}

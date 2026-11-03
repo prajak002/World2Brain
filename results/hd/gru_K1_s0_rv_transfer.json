@@ -1,0 +1,40 @@
+{
+ "vis_actions_integrated": {
+  "n": 0,
+  "heading_r2": -0.08234421279203219,
+  "heading_err_deg": 8.027343120478028,
+  "pos_r2": -1.3153521039763927
+ },
+ "vis_all": {
+  "n": 762,
+  "heading_r2": -237158.97883921885,
+  "heading_err_deg": 55.09890341781989,
+  "pos_r2": -33.356834761547226
+ },
+ "vis_actions_only": {
+  "n": 6,
+  "heading_r2": 0.13158321644970883,
+  "heading_err_deg": 5.802721594175556,
+  "pos_r2": -1.389537230822281
+ },
+ "blind_actions_integrated": {
+  "n": 0,
+  "heading_r2": -0.0675642255476323,
+  "heading_err_deg": 10.07812383970635,
+  "pos_r2": -3.7966639028302467
+ },
+ "blind_all": {
+  "n": 762,
+  "heading_r2": -7.041263097692109,
+  "heading_err_deg": 121.09954113800461,
+  "pos_r2": -4.356043273478483
+ },
+ "blind_actions_only": {
+  "n": 6,
+  "heading_r2": -1.6497840425654973,
+  "heading_err_deg": 8.017435621300816,
+  "pos_r2": -4.0894019532520645
+ },
+ "blind_window": "8:16",
+ "probe": "ridge"
+}

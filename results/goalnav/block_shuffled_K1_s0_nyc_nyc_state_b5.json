@@ -1,0 +1,16 @@
+{
+ "run": "block_shuffled_K1_s0_nyc",
+ "env": "nyc",
+ "readout": "state",
+ "blackout": 5,
+ "blackout_at": 6,
+ "steps": 40,
+ "episodes": 50,
+ "tol_deg": 45.0,
+ "max_turns": 8,
+ "fit_rollouts": 200,
+ "success": 0.04,
+ "spl": 0.03767766952514655,
+ "dist_start": 72.55981339215423,
+ "dist_final": 77.09518542249322
+}
