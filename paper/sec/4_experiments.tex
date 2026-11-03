@@ -7,7 +7,8 @@
 \begin{table}[t]
   \centering\small
   \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{lcccc}
+  \resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccc}
     \toprule
     & \multicolumn{2}{c}{Arena (5 seeds)} & \multicolumn{2}{c}{NYC twin (3 seeds)} \\
     \cmidrule(lr){2-3}\cmidrule(lr){4-5}
@@ -26,7 +27,7 @@
     copy last visible latent & 0.811 & -- & 1.558 & -- \\
     constant mean & 0.992 & -- & 0.977 & -- \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
   \caption{\textbf{Blind-horizon latent prediction.} Mean MSE over blind horizons 1 to 8 in whitened PCA-256 space
   (mean\pm sd over seeds) and cosine to the teacher latent. Every student beats both trivial predictors. The real
   wiring beats its shuffled and random controls by about 1\,\% (paired $p<0.01$ across seeds), the GRUs beat every
@@ -49,7 +50,8 @@ It is a worse one, and what follows is about what it does instead.
 \begin{table}[t]
   \centering\small
   \setlength{\tabcolsep}{3.5pt}
-  \begin{tabular}{lcccc}
+  \resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccc}
     \toprule
     & \multicolumn{2}{c}{Arena} & \multicolumn{2}{c}{NYC twin} \\
     \cmidrule(lr){2-3}\cmidrule(lr){4-5}
@@ -68,7 +70,7 @@ It is a worse one, and what follows is about what it does instead.
     actions only (linear floor) & 40.1 & 0.20 & 22.6 & 0.49 \\
     integrator (ceiling) & 0 & 1.00 & 0 & 1.00 \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
   \caption{\textbf{Heading and position decoded from the state during 8 blind steps.} Ridge probe; median absolute
   heading error in degrees and position $R^2$ relative to the start of the window, mean\pm sd over seeds. The
   connectome keeps a linearly readable heading and position code that neither GRU forms; sparse controls of the same
@@ -107,7 +109,8 @@ consistently across seeds.
 \begin{table}[t]
   \centering\small
   \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{lccc}
+  \resizebox{\linewidth}{!}{%
+\begin{tabular}{lccc}
     \toprule
     wiring & 8 dark (8:16) & 16 dark (8:24) & 20 dark (4:24) \\
     \midrule
@@ -119,12 +122,29 @@ consistently across seeds.
     dense & 21.3, 0.68 & 29.9\pm1.1, 0.46 & 21.3\pm0.5, 0.53 \\
     GRU, parameter-matched & 30.6, 0.41 & 37.7\pm0.8, 0.32 & 27.9\pm0.3, 0.50 \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
   \caption{\textbf{Dark duration, arena.} Median heading error (\degree) and position $R^2$ for longer blind windows
   (ridge probe, 3 seeds). The real wiring's margin over block-shuffled grows from 2\degree\ to 6\degree\ at 16 dark steps
   (4\degree\ on NYC, supplement).}
   \label{tab:dark}
 \end{table}
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig/video_strip.pdf}
+  \caption{\textbf{What each network sees, thinks and decodes through a blackout} (one test episode, chosen as the one
+  closest to the population medians for both models; video in the supplement). Top row: the panorama the teacher
+  receives, dimmed during the vision cut. Middle rows: the arena rendered at the pose that a ridge readout decodes from
+  each student's own activity at that moment, so each frame is literally where the network thinks it is. The connectome
+  student's decoded view stays locked to the true view through the dark; the GRU's drifts. Bottom: heading error of the
+  decoded pose over time, and the true path against both decoded paths. Both readouts show a transient when vision
+  returns at $t{=}16$. The readout is fit on 400 training episodes and never sees this episode; over the whole test
+  split the per-episode blind heading error is 17\degree\ (median) for the connectome and 43\degree\ for the GRU.}
+  \label{fig:strip}
+\end{figure*}
+
+\paragraph{Seeing it} \cref{fig:strip} shows the effect on one episode: with vision cut, the pose read out of the
+connectome state keeps rendering the right view, while the pose read out of the GRU state wanders.
 
 \paragraph{Dark duration} \cref{tab:dark} lengthens the window. Over 16 dark steps the connectome keeps heading
 within 18\degree\ and position at $R^2$\,0.82 where the GRU is at 38\degree\ and 0.32, and the real wiring's margin over
@@ -148,7 +168,8 @@ well-anchored steps.
 \begin{table}[t]
   \centering\small
   \setlength{\tabcolsep}{3.5pt}
-  \begin{tabular}{lcccc}
+  \resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccc}
     \toprule
     & \multicolumn{2}{c}{Arena} & \multicolumn{2}{c}{NYC twin} \\
     \cmidrule(lr){2-3}\cmidrule(lr){4-5}
@@ -168,7 +189,7 @@ well-anchored steps.
     GRU, parameter-matched & 13 & 0.04 & 19 & 0.12 \\
     GRU, recurrent-budget-matched & 29 & 0.15 & -- & -- \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
   \caption{\textbf{Blind homing from a linear readout of the state.} 12 visible then 24 blind steps; 50 test episodes
   per seed, 3 seeds. \% closer is the reduction of the distance to home over the blind phase. Every connectome-sized
   sparse student halves its distance from a linear readout; the GRU barely moves. The real wiring has no edge over
