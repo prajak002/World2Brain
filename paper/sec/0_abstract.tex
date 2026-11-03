@@ -1,0 +1,20 @@
+\begin{abstract}
+Insects keep a heading and a home vector for seconds in darkness using a few thousand neurons whose wiring is now known
+synapse by synapse. We ask whether that wiring is a useful prior for a modern video world model. We distil the latent
+dynamics of \vjepa (ViT-B) into a leaky recurrent student whose \emph{only} recurrent connections are the 91,663 signed
+synapses among 6,935 neurons of the \flywire \emph{Drosophila} connectome (visual projection, central complex,
+mushroom-body output and descending populations), trained purely to predict the teacher's next latent under random
+blackouts of the visual input. Against controls that fix neuron count, edge count, region structure, Dale's-law signs
+and parameter count, the connectome-wired student is \emph{not} the best predictor: a parameter-matched GRU is 25\,\%
+better, and a GRU matched to the connectome's recurrent budget is still 13\,\% better. What the wiring buys is a
+path-integrating state. During 8 blind steps a ridge probe reads heading from the connectome state to 9\degree\
+median error and position to $R^2$\,0.94, against 31\degree\ and 0.41 for the parameter-matched GRU, 36\degree\ and
+0.30 for the budget-matched GRU, and 40\degree\ for a linear readout of the action history; an MLP probe widens the gap.
+The code survives 16 dark steps (18\degree\ vs 38\degree) and transfers to a city-scale raycast environment. Sparse
+random and block-shuffled wirings of the same size form the code too, 2 to 6\degree\ worse, so the result is a property
+of connectome-scale sparse signed recurrence, with a small and consistent bonus for the real synapse list. A linear
+readout of the state drives blind homing well above a random-action floor but far below a dead-reckoning ceiling, and
+goal-vector navigation from the state does not beat random actions; we report both as negative results. On real
+handheld video no student beats a copy-last baseline. We release code, the arena and city twins, and all 424
+checkpoints.
+\end{abstract}

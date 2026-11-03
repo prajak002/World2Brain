@@ -1,0 +1,28 @@
+%% Packages used by the paper, loaded before hyperref (see main.tex).
+\usepackage{cuted}      % strip environment (two-column teaser)
+\usepackage{currfile}
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{microtype}
+
+\newcommand{\red}[1]{{\color{red}#1}}
+\newcommand{\todo}[1]{{\color{red}#1}}
+\newcommand{\TODO}[1]{\textbf{\color{red}[TODO: #1]}}
+
+\newcommand{\method}{CxWM\xspace}          % connectome world model
+\newcommand{\vjepa}{V-JEPA~2.1\xspace}
+\newcommand{\flywire}{FlyWire\xspace}
+\providecommand{\etal}{\emph{et al}.\xspace}
+\providecommand{\ie}{\emph{i.e}.\xspace}
+\providecommand{\eg}{\emph{e.g}.\xspace}
+\newcommand{\degree}{$^\circ$}
+\let\mathpm\pm
+\renewcommand{\pm}{\ensuremath{\mathpm}}   % usable in text-mode tables
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+\setlength{\abovecaptionskip}{.5em}
+\renewcommand{\paragraph}[1]{\vspace{.4em}\noindent\textbf{#1.}}

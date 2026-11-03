@@ -1,0 +1,32 @@
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Video world models and latent prediction}
+World models learn a latent transition $z_{t+1} = f(z_t, a_t)$ and use it to imagine and
+plan~\cite{ha2018world,hafner2023dreamerv3}. The joint-embedding predictive architecture replaces pixel reconstruction
+with prediction in a learned representation space~\cite{lecun2022path,bardes2024vjepa}; \vjepa scales this to internet
+video and adds an action-conditioned predictor for planning~\cite{assran2025vjepa2}. We treat \vjepa as a fixed
+teacher and ask what recurrent structure can carry its latent through time, in the spirit of knowledge
+distillation~\cite{hinton2015distilling} but into a fixed, non-trainable topology rather than a smaller network of the
+same family.
+
+\paragraph{Connectome-constrained models}
+Whole-brain \emph{Drosophila} connectomes~\cite{dorkenwald2024neuronal,schlegel2024whole} with predicted neurotransmitter
+signs~\cite{eckstein2024neurotransmitter} have enabled models whose connectivity is read off the wiring diagram rather than
+learned. Lappalainen \etal~\cite{lappalainen2024connectome} fit a connectome-constrained visual system to a motion task
+and predicted neural recordings; models of the central complex~\cite{hulse2021connectome,stone2017anatomically}
+explain heading and path-integration circuits mechanistically. These works fit neural data or hand-designed tasks. We
+instead distil a self-supervised video model into the wiring and measure what the wiring does to a world model,
+with matched-control analysis as the main instrument.
+
+\paragraph{Path integration in artificial networks}
+Recurrent networks trained to localise from velocity input develop grid- and head-direction-like
+codes~\cite{cueva2018emergence,banino2018vector,sorscher2019unified}. In those studies the task \emph{is} localisation.
+Here the task is latent video prediction; heading and position are never supervised, and the probe results show that
+whether such a code forms depends on the recurrent topology, not only on the objective.
+
+\paragraph{Controls for wiring identity}
+Degree-preserving rewiring~\cite{maslov2002specificity} is the standard null model for network structure. We extend it
+with a block-preserving variant that keeps within-region degree sequences and the region-to-region edge counts, so that
+the comparison isolates synapse-level identity from the macro-architecture, and with sign controls that keep Dale's law
+while randomising which neuron is excitatory.

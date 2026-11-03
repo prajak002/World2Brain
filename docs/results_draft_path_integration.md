@@ -145,8 +145,9 @@ not benchmarked separately; at B=1 every model here is launch-bound at about 0.3
 
 Eight phone clips (79 episodes, egomotion quantised to the five arena actions). Zero-shot every student is far off
 distribution (MSE 9.6 to 9.9, cosine 0.2 to 0.3; appendix). With leave-one-clip-out fine-tuning all students converge
-to MSE 1.18 to 1.26 and cosine 0.94; the GRU remains best. Real video is a sanity check on the pipeline, not evidence
-for the wiring.
+to MSE 1.18 to 1.26 and cosine 0.94; the GRU remains best. But the copy-last-visible baseline on the same episodes
+scores 0.84, so **no student beats the trivial predictor on real video**, and the heading probe has negative R² there.
+Real video is a sanity check on the pipeline, not evidence for the wiring; it is reported as a negative result.
 
 ## What we do not claim
 
