@@ -1,0 +1,16 @@
+{
+ "run": "gru_K1_s1_nyc",
+ "env": "nyc",
+ "readout": "state",
+ "blackout": 5,
+ "blackout_at": 6,
+ "steps": 40,
+ "episodes": 50,
+ "tol_deg": 45.0,
+ "max_turns": 8,
+ "fit_rollouts": 200,
+ "success": 0.08,
+ "spl": 0.07848649902343735,
+ "dist_start": 72.55981339215423,
+ "dist_final": 78.16905033413364
+}

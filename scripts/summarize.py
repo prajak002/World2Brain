@@ -178,5 +178,5 @@ L += ["", "## E2 Teacher-free planning (success rate, mean goal distance start -
 fm = lambda d, k, f="{:.2f}": f.format(d[k]) if k in d else "-"
 for n, d in plan.items():
     env = d.get("env", "arena") + (f" ({d['appearance']})" if d.get("appearance", "clear") != "clear" else "") + (" twin" if n.endswith("_twin") else "")
-    L.append(f"| {d['run']} | {env} | {d['task']} | {d['policy']} | {d.get('dynamics', 'student')} | {d.get('blackout', 0)} | {d['success']:.2f} | {fm(d, 'spl')} | {fm(d, 'collisions_per_100m', '{:.1f}')} | {d['dist_start']:.2f} | {d['dist_end']:.2f} | {d['episodes']} |")
+    L.append(f"| {d['run']} | {env} | {d['task']} | {d['policy']} | {d.get('dynamics', 'student')} | {d.get('blackout', 0)} | {d['success']:.2f} | {fm(d, 'spl')} | {fm(d, 'collisions_per_100m', '{:.1f}') if d.get('collisions_per_100m', 0) < 1000 else '-'} | {d['dist_start']:.2f} | {d['dist_end']:.2f} | {d['episodes']} |")
 open("results/summary.md", "w", encoding="utf-8").write("\n".join(L) + "\n"); print("\n".join(L).encode("ascii", "replace").decode())

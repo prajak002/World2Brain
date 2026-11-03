@@ -169,11 +169,11 @@ for ep in range(a.episodes):
             travelled += float(np.linalg.norm(env.pos - pos_prev)); pos_prev = env.pos.copy()
             if s: break
     succ.append(s); dist1.append(env.goal_distance()); spl.append(s * shortest / max(shortest, travelled, 1e-6))
-    coll.append(getattr(env, "collisions", 0) / max(travelled / 100.0, 1e-6) if a.env == "nyc" else 0.0); blind_steps.append(blind_used)
+    coll.append((getattr(env, "collisions", 0), travelled) if a.env == "nyc" else (0.0, travelled)); blind_steps.append(blind_used)  # pooled below
     if ep % 10 == 0: print(f"ep {ep} success so far {np.mean(succ):.2f} SPL {np.mean(spl):.2f}", flush=True)
 res = dict(run=a.run, env=a.env, appearance=a.appearance, task=a.task, policy=a.policy, dynamics=a.dynamics if a.policy == "mpc" else "-", goal_mode=a.goal_mode,
            horizon=a.horizon, iters=a.iters, n_cand=a.n_cand, success=float(np.mean(succ)), spl=float(np.mean(spl)),
-           collisions_per_100m=float(np.mean(coll)), blackout=a.blackout, blackout_trigger=a.blackout_trigger, blind_steps_mean=float(np.mean(blind_steps)),
+           collisions_per_100m=float(sum(c for c, _ in coll) / max(sum(m for _, m in coll) / 100.0, 1e-6)), blackout=a.blackout, blackout_trigger=a.blackout_trigger, blind_steps_mean=float(np.mean(blind_steps)),
            dist_start=float(np.mean(dist0)), dist_end=float(np.mean(dist1)), episodes=a.episodes, steps=a.steps, turn_noise=a.turn_noise)
 print(json.dumps(res)); os.makedirs("results/plan", exist_ok=True)
 suffix = ("" if a.dynamics == "student" or a.policy != "mpc" else f"_{a.dynamics}") + ("" if a.env == "arena" else f"_{a.env}_{a.appearance}") + (f"_blackout{a.blackout}" if a.blackout else "")
