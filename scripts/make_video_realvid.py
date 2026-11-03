@@ -92,7 +92,7 @@ for m, H in zip(models, Hs):
     print(f"{m.wiring:12s} cosine in the dark {cos[len(decoded)-1][b0:b1].mean():.3f} (copy-last {cos_copy[b0:b1].mean():.3f}); decoded heading err in the dark {herr[-1][b0:b1].mean():.1f} deg")
 # action-only floor for heading on this episode: integrate the quantised action record
 th_act = np.zeros(T)
-for t in range(1, T): th_act[t] = th_act[t - 1] + (np.pi / 8) * ((acts[t - 1] == 2) - (acts[t - 1] == 3))
+for t in range(1, T): th_act[t] = th_act[t - 1] + (np.pi / 8) * (float(acts[t - 1] == 2) - float(acts[t - 1] == 3))
 herr_act = np.degrees(np.abs(np.angle(np.exp(1j * (hd[0] + th_act - hd)))))
 
 # ------------------------------------------------------------------ teacher latent 2-D trajectory
@@ -182,6 +182,7 @@ subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", a.out, "-vf", "fps=3
 plt.rcParams.update({"font.family": "serif", "font.size": 8, "axes.titlesize": 8, "pdf.fonttype": 42})
 cols_t = [b0 - 2, b0 - 1, b0 + 1, b0 + 4, b1 - 1, b1 + 1]
 fig2 = plt.figure(figsize=(7.2, 5.0)); gs = fig2.add_gridspec(4, len(cols_t), height_ratios=[1, 1, 1, 1.5], hspace=0.28, wspace=0.08)
+gsb = gs[3, :].subgridspec(1, 2, wspace=0.35)
 rows = [("real frame", lambda t: frames[t]), ("fly connectome\nimagines", lambda t: imagined[0][t]), ("GRU\nimagines", lambda t: imagined[1][t])]
 for ri, (lab, fn) in enumerate(rows):
     for ci, t in enumerate(cols_t):
@@ -191,14 +192,14 @@ for ri, (lab, fn) in enumerate(rows):
         if ri == 0: ax.set_title(f"t={t}" + ("  (dark)" if b0 <= t < b1 else ""), fontsize=7.5, color="#c0392b" if b0 <= t < b1 else "black")
         if ci == 0: ax.set_ylabel(lab, fontsize=7.5)
         for sp in ax.spines.values(): sp.set_edgecolor("#c0392b" if (b0 <= t < b1 and ri > 0) else "#999"); sp.set_linewidth(1.2 if (b0 <= t < b1 and ri > 0) else 0.5)
-ax = fig2.add_subplot(gs[3, :3])
+ax = fig2.add_subplot(gsb[0, 0])
 for i, (lab, c) in enumerate([("fly connectome", "#c0392b"), ("GRU", "#1c2833")]): ax.plot(np.arange(T), cos[i], color=c, lw=1.4, marker="o", ms=2.5, label=lab)
 ax.plot(np.arange(T), cos_copy, color="#7f8c8d", lw=1.2, ls=":", label="copy last visible")
 ax.axvspan(b0 - 0.5, b1 - 0.5, color="#c0392b", alpha=0.08); ax.set_ylim(0, 1); ax.set_xlim(0, T - 1); ax.set_xlabel("time step"); ax.set_ylabel("cosine to teacher latent"); ax.legend(frameon=False, fontsize=6.5, loc="lower left")
 for sp in ("top", "right"): ax.spines[sp].set_visible(False)
-ax = fig2.add_subplot(gs[3, 3:])
+ax = fig2.add_subplot(gsb[0, 1])
 for i, (lab, c) in enumerate([("fly connectome", "#c0392b"), ("GRU", "#1c2833")]): ax.plot(np.arange(T), herr[i], color=c, lw=1.4, marker="o", ms=2.5, label=lab)
 ax.plot(np.arange(T), herr_act, color="#7f8c8d", lw=1.2, ls=":", label="action-count integrator")
-ax.axvspan(b0 - 0.5, b1 - 0.5, color="#c0392b", alpha=0.08); ax.set_xlim(0, T - 1); ax.set_xlabel("time step"); ax.set_ylabel("heading error vs. egomotion (deg)"); ax.legend(frameon=False, fontsize=6.5, loc="upper left")
+ax.axvspan(b0 - 0.5, b1 - 0.5, color="#c0392b", alpha=0.08); ax.set_xlim(0, T - 1); ax.set_xlabel("time step"); ax.set_ylabel("heading error (deg)", labelpad=1); ax.legend(frameon=False, fontsize=6.5, loc="upper left")
 for sp in ("top", "right"): ax.spines[sp].set_visible(False)
 fig2.savefig(a.strip, bbox_inches="tight"); print("wrote", a.strip)

@@ -31,7 +31,7 @@ p.add_argument("--out", default="data/realvid_all.npz")
 p.add_argument("--fps", type=float, default=2.0, help="env steps per second of video (arena episodes are 24 steps)")
 p.add_argument("--sub", type=int, default=4, help="sub-frames per step used for flow accumulation")
 p.add_argument("--steps", type=int, default=24); p.add_argument("--stride", type=int, default=24, help="steps between episode starts (24 = no overlap)")
-p.add_argument("--clip", type=int, default=8); p.add_argument("--res", type=int, default=256); p.add_argument("--eye", default="32x8")
+p.add_argument("--batch", type=int, default=8, help="clips per teacher forward (4 fits a 4 GB GPU)"); p.add_argument("--clip", type=int, default=8); p.add_argument("--res", type=int, default=256); p.add_argument("--eye", default="32x8")
 p.add_argument("--fov_deg", type=float, default=60.0, help="horizontal FoV of the square crop (phone main camera, portrait: ~60 deg)")
 p.add_argument("--turn_deg", type=float, default=6.0, help="|yaw| per step above which the step is a turn")
 p.add_argument("--fwd_px", type=float, default=1.0, help="radial expansion per step above which the step is forward (below -x: back)")
@@ -97,10 +97,11 @@ def add_teacher(d, device):
         fr = full[i]
         if a.causal:   # clip ending at t, like collect.py --causal 1
             padded = np.concatenate([np.repeat(fr[:1], a.clip - 1, 0), fr]); idx = np.arange(T)[:, None] + np.arange(a.clip)[None]; clips = padded[idx].repeat(2, axis=1)
-            Z.append(np.concatenate([teacher.per_step_latents(torch.from_numpy(np.ascontiguousarray(clips[j:j + 8])).to(device))[:, -1].cpu().numpy() for j in range(0, T, 8)]).astype(np.float16))
+            Z.append(np.concatenate([teacher.per_step_latents(torch.from_numpy(np.ascontiguousarray(clips[j:j + a.batch])).to(device))[:, -1].cpu().numpy() for j in range(0, T, a.batch)]).astype(np.float16))
         else:
             clips = fr.reshape(T // a.clip, a.clip, a.res, a.res, 3).repeat(2, axis=1)       # 1 env step = 1 tubelet
             Z.append(teacher.per_step_latents(torch.from_numpy(np.ascontiguousarray(clips)).to(device)).cpu().numpy().reshape(T, -1).astype(np.float16))
+        if i % 5 == 0 or i == E - 1: print(f"teacher: episode {i + 1}/{E}", flush=True)
     d["z"] = np.stack(Z); print("teacher latents", d["z"].shape)
     return d
 

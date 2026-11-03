@@ -231,8 +231,26 @@ With the synapse threshold at 1, 5 or 10, with the mushroom bodies or the descen
 central complex alone, the real wiring beats its degree-shuffled twin by 0.02 to 0.04 MSE (one seed each;
 \cref{tab:ablation}). No single region carries the margin.
 
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig/realvid_strip.pdf}
+  \caption{\textbf{The same test on real handheld video} (one held-out phone clip of a street market; both students
+  fine-tuned on the other seven clips; video in the supplement). Top: the real frame, dimmed during the vision cut.
+  Middle rows: the training frame whose teacher latent is nearest to each student's guess, \ie what each imagines.
+  Bottom left: cosine to the teacher latent; both students track it at 0.96 but a copy-last baseline (dotted) is at
+  0.98, because a handheld frame changes little in half a second. Bottom right: heading decoded from the state against
+  the clip's own egomotion estimate; on this clip the GRU (4\degree) is closer than the connectome (17\degree), and a
+  plain count of the estimated turn actions (dotted) is as good as either. The path-integration result of
+  \cref{fig:strip} does \emph{not} transfer to real video as collected here, and we report it as such.}
+  \label{fig:realvid}
+\end{figure*}
+
 \paragraph{Real handheld video (negative)} Eight phone clips (79 episodes, egomotion from phase correlation quantised
 to the five actions). Zero-shot, every student is off distribution (MSE 9.6 to 9.9). With leave-one-clip-out
 fine-tuning all students reach MSE 1.18 to 1.26 and cosine 0.94, the GRU best, but a copy-last-visible baseline on the
-same episodes scores 0.84. No student beats the trivial predictor on real video, and the heading probe has negative
-$R^2$ there. Real video is a sanity check on the pipeline, not evidence for the wiring (\cref{sec:suppl-realvid}).
+same episodes scores 0.84. No student beats the trivial predictor on real video, and the heading probe is at the
+action-count floor there (\cref{fig:realvid}). Real video is a sanity check on the pipeline, not evidence for the wiring
+(\cref{sec:suppl-realvid}). Two reasons are visible in the figure: the footage walks mostly straight, so the
+egomotion-derived heading barely varies and the quantised action record already explains it; and at 2\,Hz the teacher
+latent is nearly constant between steps, which is why copy-last wins. A fair real-video test needs footage with real
+turns, an odometry ground truth and a higher step rate; we leave it as the first item of future work.
