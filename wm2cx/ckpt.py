@@ -4,6 +4,7 @@ so a checkpoint is reconstructed in exactly one place."""
 from __future__ import annotations
 import torch
 from wm2cx.student import FlyBrain, GRUBaseline
+from wm2cx.transformer import TransformerWM
 from wm2cx.connectome import load as load_conn
 from wm2cx.data import Latents
 
@@ -15,9 +16,12 @@ def build_model(args, conn, obs_dim=OBS_DIM, state=None):
     if args["wiring"] == "gru":
         vis_flag = bool(args.get("vis_flag", state is None or state["cell.weight_ih"].shape[1] == obs_dim + 6))
         return GRUBaseline(obs_dim, args["k"], args["gru_hidden"], vis_flag=vis_flag)
+    if args["wiring"] == "transformer":
+        return TransformerWM(obs_dim, args["k"], int(args.get("d_model", 256)), int(args["n_layers"]), vis_flag=bool(args.get("vis_flag", 1)))
     vis_flag = bool(args.get("vis_flag", state is None or "w_vis" in state))
     return FlyBrain(conn, obs_dim, args["k"], wiring=args["wiring"], n_brains=args["n_brains"], seed=args["seed"],
-                    vis_flag=vis_flag, in_rank=int(args.get("in_rank", 0)), learn_alpha=bool(args.get("learn_alpha", 0)), gate=bool(args.get("gate", 0)))
+                    vis_flag=vis_flag, in_rank=int(args.get("in_rank", 0)), learn_alpha=bool(args.get("learn_alpha", 0)), gate=bool(args.get("gate", 0)),
+                    in_mode=args.get("in_mode", "linear"), hybrid=bool(args.get("hybrid", 0)))
 
 
 def latents_from(ck):

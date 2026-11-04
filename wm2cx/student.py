@@ -81,12 +81,38 @@ def block_counts(post, pre, region):
     return dict(zip(u.tolist(), c.tolist()))
 
 
+class AttnInput(nn.Module):
+    """Cross-attention input encoder replacing the linear W_in: every VIS neuron owns a learned query that attends over
+    patch tokens of the fly-eye image and reads one scalar drive. About 80 k parameters against 1.8 M for the linear map,
+    so the shared input layer stops dominating the parameter budget (#3) and VIS neurons can read spatial structure."""
+    def __init__(self, n_out, eh=8, ew=32, ch=3, patch=2, d=32):
+        super().__init__()
+        self.eh, self.ew, self.ch, self.patch, self.d = eh, ew, ch, patch, d
+        self.n_tok = (eh // patch) * (ew // patch); self.pd = patch * patch * ch; self.in_features = eh * ew * ch
+        self.embed = nn.Linear(self.pd, d); self.pos = nn.Parameter(torch.randn(self.n_tok, d) * 0.02)
+        self.q = nn.Parameter(torch.randn(n_out, d) * 0.02); self.k = nn.Linear(d, d, bias=False); self.v = nn.Linear(d, d, bias=False)
+        self.out = nn.Linear(d, 1)
+
+    def forward(self, obs):                                                # obs [B, eh*ew*ch] laid out as [eh, ew, ch]
+        B = obs.shape[0]; p = self.patch
+        x = obs.view(B, self.eh // p, p, self.ew // p, p, self.ch).permute(0, 1, 3, 2, 4, 5).reshape(B, self.n_tok, self.pd)
+        t = self.embed(x) + self.pos; k, v = self.k(t), self.v(t)
+        att = torch.softmax(torch.einsum("nd,btd->bnt", self.q, k) / self.d ** 0.5, -1)
+        return self.out(torch.einsum("bnt,btd->bnd", att, v)).squeeze(-1)
+
+    def flops(self):
+        return self.n_tok * self.pd * self.d + 2 * self.n_tok * self.d * self.d + 2 * self.q.shape[0] * self.n_tok * self.d + self.q.shape[0] * self.d
+
+
 class FlyBrain(nn.Module):
     def __init__(self, conn, obs_dim, z_dim, act_dim=5, wiring="connectome", n_brains=1, alpha=0.5, seed=0, signed=None,
-                 vis_flag=True, in_rank=0, edges=None, learn_alpha=False, gate=False):
+                 vis_flag=True, in_rank=0, edges=None, learn_alpha=False, gate=False, in_mode="linear", hybrid=False):
         """Neuron-model ablation (wiring fixed): learn_alpha = per-neuron learnable time constant alpha_i = sigmoid(a_i);
         gate = GRU-style update gate g_i = sigmoid(gain_g (W_g h + W_in_g o + b_g)) carried on a second (unsigned) weight per
-        connectome edge and a second VIS input map, so h <- (1-g) h + g tanh(...). Both keep the edge list fixed."""
+        connectome edge and a second VIS input map, so h <- (1-g) h + g tanh(...). Both keep the edge list fixed.
+        in_mode = "attn": cross-attention input encoder (AttnInput) instead of the linear W_in.
+        hybrid = True: one shared attention layer over cell-type-pooled activity every step (global routing the sparse
+        graph lacks), added to the recurrent drive; the edge list is unchanged."""
         super().__init__()
         N, post, pre, sign = build_edges(conn, wiring, n_brains, seed) if edges is None else edges
         self.N = N; self.alpha = alpha; self.wiring = wiring; self.act_dim = act_dim
@@ -105,8 +131,17 @@ class FlyBrain(nn.Module):
             indeg = torch.bincount(self.e_post, minlength=N).clamp(min=1).float()
             w0 = torch.randn(len(post), generator=g) / indeg[self.e_post].sqrt()
             self.W_raw = nn.Parameter(w0.abs() if self.signed else w0 * 0.8); self.n_edges = len(post)
-        nv = len(vis_idx); self.in_rank = in_rank
-        self.W_in = nn.Linear(obs_dim, nv) if in_rank <= 0 else nn.Sequential(nn.Linear(obs_dim, in_rank, bias=False), nn.Linear(in_rank, nv))
+        nv = len(vis_idx); self.in_rank = in_rank; self.in_mode = in_mode
+        if in_mode == "attn": self.W_in = AttnInput(nv)
+        else: self.W_in = nn.Linear(obs_dim, nv) if in_rank <= 0 else nn.Sequential(nn.Linear(obs_dim, in_rank, bias=False), nn.Linear(in_rank, nv))
+        self.hybrid = hybrid
+        if hybrid:
+            ct = np.tile(conn["cell_type"], n_brains); _, gid = np.unique(ct, return_inverse=True); self.G = int(gid.max()) + 1; d = 32
+            self.register_buffer("grp", torch.from_numpy(gid.astype(np.int64)))
+            self.register_buffer("grp_n", torch.bincount(self.grp, minlength=self.G).float().clamp(min=1))
+            self.h_up = nn.Parameter(torch.randn(d) * 0.1); self.h_emb = nn.Parameter(torch.randn(self.G, d) * 0.02)
+            self.h_ln = nn.LayerNorm(d); self.h_attn = nn.MultiheadAttention(d, 4, batch_first=True)
+            self.h_down = nn.Linear(d, 1); self.h_gain = nn.Parameter(torch.zeros(1))
         self.W_act = nn.Linear(act_dim, N, bias=False)
         self.w_vis = nn.Parameter(torch.zeros(N)) if vis_flag else None
         self.b = nn.Parameter(torch.zeros(N)); self.gain = nn.Parameter(torch.ones(N))
@@ -148,9 +183,21 @@ class FlyBrain(nn.Module):
 
     def flops_per_step(self, obs_dim=None):
         """Multiply-adds per step for one sample (recurrence + input/action/readout projections)."""
-        lin = self.W_in if self.in_rank <= 0 else self.W_in[0]; obs_dim = lin.in_features if obs_dim is None else obs_dim
-        nv = len(self.vis_idx); inp = obs_dim * nv if self.in_rank <= 0 else self.in_rank * (obs_dim + nv)
-        return 2 * (self.n_edges + inp + self.act_dim * self.N + self.N * self.W_out.out_features)
+        nv = len(self.vis_idx)
+        if self.in_mode == "attn": inp = self.W_in.flops()
+        else:
+            lin = self.W_in if self.in_rank <= 0 else self.W_in[0]; obs_dim = lin.in_features if obs_dim is None else obs_dim
+            inp = obs_dim * nv if self.in_rank <= 0 else self.in_rank * (obs_dim + nv)
+        hyb = (self.N + self.G * (32 + 4 * 32 * 32) + self.G * self.G * 32) if self.hybrid else 0
+        return 2 * (self.n_edges + inp + self.act_dim * self.N + self.N * self.W_out.out_features + hyb)
+
+    def global_msg(self, h):
+        """Hybrid ablation: cell-type-pooled activity -> one self-attention layer over the type tokens -> one scalar per type,
+        broadcast back to its neurons. Starts at zero gain so the model begins as the plain connectome student."""
+        pooled = torch.zeros(h.shape[0], self.G, device=h.device, dtype=h.dtype).index_add_(1, self.grp, h) / self.grp_n
+        x = self.h_ln(pooled[..., None] * self.h_up + self.h_emb)
+        y, _ = self.h_attn(x, x, x, need_weights=False)
+        return self.h_gain * self.h_down(y).squeeze(-1)[:, self.grp]
 
     # ---------------- dynamics ----------------
     def init_state(self, B, device): return torch.zeros(B, self.N, device=device)
@@ -162,6 +209,7 @@ class FlyBrain(nn.Module):
         inp = inp + self.W_act(F.one_hot(act, self.act_dim).float()) * self.act_mask
         if self.w_vis is not None: inp = inp + self.w_vis * (1 - visible)[:, None]
         pre = self.recur(h, w) + inp + self.b
+        if self.hybrid: pre = pre + self.global_msg(h)
         if self.gate:
             gi = torch.zeros_like(h).index_add_(1, self.vis_idx, self.W_in_g(obs) * visible[:, None])
             a = torch.sigmoid(self.gain_g * (self.recur(h, self.Wg_raw) + gi + self.b_g))

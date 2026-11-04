@@ -127,30 +127,13 @@ the GRU's width; ``rand@CX'' is a random subset the size of the central complex.
 
 \subsection{Real handheld video}
 \label{sec:suppl-realvid}
-\begin{table}[h]
-  \centering\small
-  \resizebox{\linewidth}{!}{%
-\begin{tabular}{lcccc}
-    \toprule
-    & \multicolumn{2}{c}{zero-shot} & \multicolumn{2}{c}{leave-one-clip-out fine-tuned} \\
-    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
-    wiring (5 seeds) & MSE & cos & MSE & cos \\
-    \midrule
-    GRU, parameter-matched & 9.94\pm0.07 & 0.20 & 1.18\pm0.00 & 0.94 \\
-    dense & 9.73\pm0.07 & 0.26 & 1.21\pm0.04 & 0.94 \\
-    connectome & 9.68\pm0.10 & 0.27 & 1.24\pm0.02 & 0.94 \\
-    degree-shuffled & 9.69\pm0.09 & 0.27 & 1.25\pm0.02 & 0.94 \\
-    connectome, unsigned & 9.59\pm0.13 & 0.28 & 1.26\pm0.00 & 0.94 \\
-    random & 9.56\pm0.19 & 0.30 & 1.26\pm0.01 & 0.94 \\
-    \midrule
-    copy last visible latent & \textbf{0.84} & -- & \textbf{0.84} & -- \\
-    constant mean & 10.28 & -- & 10.28 & -- \\
-    \bottomrule
-  \end{tabular}}
-  \caption{Eight phone clips, 79 episodes, egomotion quantised to the five arena actions, blind window 8:16. No student
-  beats the copy-last baseline even after fine-tuning; the latent of handheld video changes little over a 2\,Hz step.}
-  \label{tab:realvid}
-\end{table}
+The clips are walked with a phone held at chest height; each is centre-cropped to a square, resampled to 2\,Hz and cut
+into non-overlapping 24-step episodes. Yaw per step is the mean horizontal phase-correlation shift over a $4\times4$
+patch grid converted through a 60\degree\ horizontal field of view; forward motion is the mean radial expansion. Steps
+with $|{\rm yaw}| > 6^\circ$ become turn actions, steps with expansion above 1\,px forward, below $-1$\,px back, the
+rest stay. The heading target of the probe is the integrated continuous yaw, not the quantised record, so the
+``actions only'' floor and the probe measure different things on this data. Zero-shot, fine-tuned and probe numbers for
+every architecture are in \cref{tab:realvid}; per-clip numbers are in \texttt{results/summary.md}.
 
 \subsection{Teacher-free planning (negative)}
 Latent CEM-MPC with the student as dynamics model succeeds in 0 to 3\,\% of arena navigation episodes for every

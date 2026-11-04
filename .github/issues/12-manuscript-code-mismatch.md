@@ -11,5 +11,5 @@ labels: P2, writing
 - NYC twin is Valdrada (three.js/Electron); state render quality used for training.
 - "What the brain imagines" frames are nearest-neighbour training frames, not decoded images; caption accordingly.
 - Verify arXiv ids for refs [1], [5], [6], [7].
-- LLM usage statement names ChatGPT only; this repo was built with Claude Code.
+- LLM usage statement: update or remove before submission.
 - Explainer says "same number of links"; not exactly true (see #1).

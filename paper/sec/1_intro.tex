@@ -43,33 +43,46 @@ input, so any structure that appears in its state was not asked for.
 The answer has two halves, and we think both are worth stating plainly. The wiring is \emph{not} a better predictor.
 Against controls that hold neuron count, edge count, region block structure, Dale's-law sign structure and parameter
 count fixed, the real connectome beats its shuffled twins by about one percent of latent error, consistently, while a
-parameter-matched GRU is 25\,\% better and a GRU matched to the connectome's \emph{recurrent} budget is still 13\,\%
-better. What the wiring buys instead is a \emph{path-integrating state} (\cref{fig:main}). During the blind steps a
-ridge probe reads heading from the connectome state to 9\degree\ median error and position to $R^2$\,0.94. The
-parameter-matched GRU, which predicts the latent far better, gives 31\degree\ and 0.41; the budget-matched GRU gives
-36\degree\ and 0.30; a linear readout of the action history, which is all the state could possibly have integrated,
-gives 40\degree. The code survives 16 and 20 dark steps, shows up again in a city-scale raycast twin of Manhattan, and
-widens rather than closes under a non-linear probe.
+parameter-matched GRU is \nGruBetterArena\,\% better and a parameter-matched causal transformer, the recurrent core of
+most current latent world models~\cite{micheli2023iris,zhang2023storm,zhou2024dinowm}, is \nTfBetterArena\,\% better.
+What the wiring buys instead is a \emph{path-integrating state} (\cref{fig:main}). During the blind steps a ridge probe
+reads heading from the connectome state to \nConnArenaHd\degree\ median error and position to $R^2$\,\nConnArenaPos.
+The GRU, which predicts the latent far better, gives \nGruArenaHd\degree\ and \nGruArenaPos; the transformer, which can
+attend over every visible frame it has seen, gives \nTfArenaHd\degree\ and \nTfArenaPos; a linear readout of the action
+history gives \nActOnlyArenaHd\degree. The code survives 16 and 20 dark steps, shows up again in a city-scale raycast
+twin of Manhattan, widens rather than closes under a non-linear probe, and persists when turn angles are drawn from a
+continuous distribution, so that the action record alone no longer determines heading and the state has to integrate
+something it is not told.
 
 Three further findings keep the claim honest, and we report all of them in full. First, sparse random and
-block-shuffled wirings of the same size form the code too, 2\degree\ to 6\degree\ worse than the real graph; the exact
-synapse list is a small, reproducible bonus, not the cause. Second, a linear readout of the state drives blind homing
-well above a random-action floor (NYC twin: 37\,\% success against 0\,\%) but well below a dead-reckoning ceiling
-(92\,\%), and steering toward a decoded goal vector does not beat random actions. The controller is not the bottleneck;
-the readout is. Third, on real handheld video no student, fine-tuned or not, beats a copy-last-visible baseline.
+block-shuffled wirings of the same size form the code too, \nConnBlockGapArena\ to \nConnBlockGapArenaDarkSixteen\degree\ worse
+than the real graph; the exact synapse list is a small, reproducible bonus, not the cause. Second, the gap between the
+sparse students and the dense sequence models does not live in the input map: replacing the shared linear map by a
+per-neuron cross-attention encoder, which removes two thirds of the sparse students' parameters, leaves both the
+prediction gap and the path-integration gap in place, and adding one attention layer over cell-type tokens to the
+connectome recurrence shows what the sparse graph is missing. Third, a linear readout of the state drives blind homing
+well above a random-action floor but well below a dead-reckoning ceiling, and steering toward a decoded goal vector
+does not beat random actions; the controller is not the bottleneck, the readout is. On \nRvClips\ real phone clips
+walked through city streets we report every architecture zero-shot, fine-tuned and under a simulator-fit heading
+readout, and state exactly what does and does not transfer.
 
 \paragraph{Contributions}
 \begin{itemize}
   \item A distillation recipe that turns a video foundation model into a world model whose recurrence is a fixed,
         signed, biologically sourced sparse graph, with controls that separate wiring identity from density, degree
-        sequence, region structure and sign structure (\cref{sec:method}).
+        sequence, region structure and sign structure, and with parameter-matched GRU and causal-transformer
+        predictors of the kind used by current latent world models (\cref{sec:method}).
   \item The first demonstration, to our knowledge, that a connectome-wired latent predictor forms a linearly readable
-        heading and position code in the dark that a GRU trained on the same objective does not, with the
-        information-ceiling, feature-count and non-linearity controls needed to read that result correctly
-        (\cref{sec:probes}).
+        heading and position code in the dark that neither a GRU nor a transformer trained on the same objective forms,
+        with the information-ceiling, continuous-turn, feature-count and non-linearity controls needed to read that
+        result correctly (\cref{sec:probes}).
+  \item Two architectural probes of \emph{where} the sparse-versus-dense gap lives: a cross-attention input encoder
+        that removes the shared linear map, and a hybrid that adds cell-type-level attention to the connectome
+        recurrence (\cref{sec:gap}).
   \item A behavioural test of that code (blind homing, goal-vector navigation) with oracle, dead-reckoning and random
-        controls, reported in full including the negative outcomes, plus cost, data efficiency, scaling, subgraph
-        ablation and real-video transfer (\cref{sec:behaviour,sec:more}).
-  \item Two environments (a 360\degree\ arena and a raycast twin of Midtown Manhattan), the full pipeline, and all 424
-        checkpoints across 5 seeds and 12 wirings, released for reuse.
+        controls, reported in full including the negative outcomes, plus real phone video as a third world with
+        zero-shot, fine-tuned and probe-transfer results (\cref{sec:behaviour,sec:realvid}).
+  \item Two simulated environments (a 360\degree\ arena and a raycast twin of Midtown Manhattan), the real-video ingest
+        pipeline, the full training and evaluation code, an interactive explainer, and all checkpoints, released for
+        reuse.
 \end{itemize}

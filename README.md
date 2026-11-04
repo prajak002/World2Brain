@@ -102,6 +102,23 @@ checkpoints (not in the repo).
 
 Full per-run numbers: `results/summary.md`; raw JSON in `results/runs`, `results/hd`, `results/plan`.
 
+## Run 2 (2026-11-04, AWS L4): transformer baseline, attention input, hybrid routing, continuous turns
+
+`scripts/run_l4.sh` reruns the arena / NYC-twin protocol with three additions, all parameter-matched (#4):
+`--wiring transformer` (causal pre-LN transformer predictor, `wm2cx/transformer.py`), `--in_mode attn` (cross-attention
+input encoder, `AttnInput` in `wm2cx/student.py`, which removes the dead input parameters) and `--hybrid 1` (one attention
+layer over cell-type-pooled activity on top of the connectome recurrence). A second copy of the arena data is collected
+with `--turn_noise 0.3` (`data/*_tn_*.npz`, runs tagged `_tn`) so that heading is no longer a linear function of the
+action counts. Tables land in `results/summary.md` as before.
+
+`docs/distill3d.html` (built by `scripts/build_distill_page.py` from `results/brain3d.json`) is an interactive three.js
+walk through the pipeline, layer by layer, for a general audience.
+
+Real-video stage (queued behind run 2): `scripts/run_l4_realvid.sh` evaluates every arena, attention-input and NYC-twin
+checkpoint on `data/realvid_all.npz` (9 phone clips, 82 episodes: the 8-clip Kaggle mirror plus one clip ingested 2026-11-04; mirror `popsensharma/world2brain-realvid`,
+file `realvid_all_z.npz`): zero-shot (`_realvid`), leave-one-clip-out fine-tuning (`_realvid_ft`), and heading probes with
+a simulator-fit (`_rv_transfer`) or clip-fit (`_rv_indomain`) readout. Results land in the same tables via `summarize.py`.
+
 ## End-to-end demo (NYC digital twin, high-quality render)
 
 ![End-to-end demo](docs/media/wm2cx_nyc_e2e.gif)
@@ -257,6 +274,6 @@ trivial predictors for the same episodes, so `summarize.py` shows E7 as its own 
 `scripts/vast_launch.sh` rents one RTX 4090 on Vast.ai and drives the GPU script end to end.
 
 ## Web pages
-- `docs/explainer.html`: plain-language five-scene explainer with results (also published at https://claude.ai/artifact/W8qroZnbBSigaW2W3CGW1P).
-- `docs/world_brain_split.html`: world view and 3D brain side by side on one shared step slider, Times Square episode at 768 px (https://claude.ai/artifact/86AKeF8BLACdNqbENmv2BB). Built by `scripts/build_split_page.py`.
-- `docs/brain3d.html`: interactive 3D replay of the trained student on real FlyWire neuron positions, teacher latent vs reconstruction, scroll chapters and personal notes (https://claude.ai/artifact/4TuHXcWNksMpqvrSr9VxDL). Built by `scripts/build_brain3d_page.py` from an export of positions + activity.
+- `docs/explainer.html`: plain-language five-scene explainer with results.
+- `docs/world_brain_split.html`: world view and 3D brain side by side on one shared step slider, Times Square episode at 768 px. Built by `scripts/build_split_page.py`.
+- `docs/brain3d.html`: interactive 3D replay of the trained student on real FlyWire neuron positions, teacher latent vs reconstruction, scroll chapters and personal notes. Built by `scripts/build_brain3d_page.py` from an export of positions + activity.

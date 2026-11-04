@@ -21,9 +21,18 @@
 Episodes are 24 steps under a scripted policy; 1,000 training and 200 test episodes.
 
 \paragraph{NYC twin} A raycast model of Midtown Manhattan built from building footprints (\cref{fig:envs}, bottom):
-forward-facing 110\degree\ camera at 256\,px, forward 4\,m, back 2\,m, goals 30 to 60\,m away; 120 training and 30
-test episodes at Times Square, 3 seeds. It adds occlusion, perspective and a real street graph to the arena's clean
-geometry.
+forward-facing 110\degree\ camera at 256\,px, forward 4\,m, back 2\,m, goals 30 to 60\,m away; 600 episodes around
+Times Square, split \emph{geographically} into training and test street blocks (120\,m blocks with a 40\,m margin) so
+that no test episode starts in a block seen in training. It adds occlusion, perspective and a real street graph to the
+arena's clean geometry.
+
+\paragraph{Real handheld video} Nine phone clips walked through New York streets (82 episodes of 24 steps at 2\,Hz, 256\,px
+centre crops). There are no ground-truth actions: yaw and forward motion are estimated from the footage by patch-wise
+phase correlation and quantised to the five arena actions, with the continuous estimates kept for the probes
+(\cref{sec:suppl-realvid}). Every student trained on the arena, the attention-input variants and the NYC twin is
+evaluated on this file zero-shot and after leave-one-clip-out fine-tuning, and the heading probe is run both with the
+simulator-fit readout (transfer) and with a readout fit on the other clips (in-domain). This is the only world with real
+pixels and real egomotion noise; it is a test set, never a training set, except in the fine-tuning condition.
 
 \paragraph{Blackouts} During training, each episode has a random contiguous window in which the visual input is
 replaced by zero and only the action is given. At test the window is steps 8 to 16 unless stated (also 8 to 24 and 4 to
@@ -82,8 +91,25 @@ absence of self-loops, and Dale-consistent signs at the real excitatory fraction
         \emph{total} parameter count (3.71\,M), receiving the same input, action and visibility flag.
   \item \textbf{GRU, recurrent-budget-matched}: 174 hidden units, 90,828 recurrent weights, matched to the connectome's
         \emph{recurrent} parameter count (0.54\,M in total).
+  \item \textbf{Transformer}: a causal pre-LN transformer predictor in the style of IRIS, STORM and
+        DINO-WM~\cite{micheli2023iris,zhang2023storm,zhou2024dinowm}, one token per step ($o_t v_t$, $a_{t-1}$, $v_t$),
+        width 256, depth chosen as the deepest model within the sparse student's total parameter count (4 layers, 3.44\,M).
+        Its ``state'' for every probe and readout is the last layer's token; in closed loop it attends over its own past
+        tokens, which is the memory a transformer world model actually has.
 \end{itemize}
-Learning rates were selected per architecture on a validation split. Five seeds on the arena, three on NYC. Paired
+
+\paragraph{Input encoder and global routing (ablations)}
+Two thirds of the sparse student's parameters sit in the shared linear input map, not in the wiring. We therefore also
+train every architecture with a \emph{cross-attention input encoder}: each VIS neuron owns a learned query over the
+$2\times2$ patches of the fly-eye image (0.11\,M parameters instead of 1.83\,M), and the GRU and transformer are
+re-matched to the smaller budget (2.0\,M). A \emph{hybrid} student adds one self-attention layer over cell-type-pooled
+activity (796 FlyWire cell types, 32-d tokens, 30\,k parameters) to the connectome recurrence at every step, with the
+edge list unchanged; it asks whether the global routing a sparse graph lacks is what separates it from the GRU.
+
+\paragraph{Continuous turns} In a second copy of the arena data every turn is $22.5^\circ\,(1+\epsilon)$ with
+$\epsilon \sim \mathcal{N}(0, 0.3)$, so relative heading is no longer a linear function of the action counts and
+dead reckoning of the discrete action record is no longer exact. All architectures are retrained and probed on it.
+Learning rates were selected per architecture on a validation split. \nSeeds\ seeds on the arena, \nSeedsNyc\ on NYC. Paired
 comparisons use the shared test episodes; we report mean\pm sd over seeds and 95\,\% $t$-intervals where $n \ge 3$.
 
 \subsection{Probes and behavioural readouts}

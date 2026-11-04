@@ -107,7 +107,7 @@ confounds in B fixed and a much stronger head-direction story.
   label it as such in any figure caption. It is not a decoded image.
 - References [5] FLYNN (arXiv 2607.00025), [6] (2602.17997), [7] FlyCNS (2609.28816) and [1] (2603.14482)
   could not be verified from this repo; confirm every arXiv id and author list before submission.
-- LLM usage statement names ChatGPT only; this repo was built with Claude Code. Update the statement.
+- LLM usage statement: update or remove before submission.
 
 ## D. Positioning risks (reviewer attacks to pre-empt)
 

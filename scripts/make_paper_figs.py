@@ -27,23 +27,29 @@ LABEL = {
     "connectome_nosign": "connectome, unsigned", "block_shuffled": "block-shuffled",
     "shuffled": "degree-shuffled", "random": "random", "dense": "dense",
     "gru": "GRU, parameter-matched", "gru_recmatch": "GRU, recurrent-budget-matched",
+    "transformer": "Transformer, parameter-matched", "connectome_attnin": "connectome, attention input",
+    "gru_attnin": "GRU, attention input", "transformer_attnin": "Transformer, attention input",
+    "block_shuffled_attnin": "block-shuffled, attention input", "connectome_hybrid": "connectome + cell-type attention",
 }
 COLOR = {
     "connectome": "#c0392b", "connectome_randsign": "#e07b6a", "connectome_nosign": "#f0b8ad",
     "block_shuffled": "#2e86c1", "shuffled": "#5dade2", "random": "#85c1e9",
-    "dense": "#7f8c8d", "gru": "#1c2833", "gru_recmatch": "#566573",
+    "dense": "#7f8c8d", "gru": "#1c2833", "gru_recmatch": "#566573", "transformer": "#6c3483",
+    "connectome_attnin": "#e67e22", "gru_attnin": "#34495e", "transformer_attnin": "#9b59b6",
+    "block_shuffled_attnin": "#5499c7", "connectome_hybrid": "#b03a2e",
 }
 MARK = {"connectome": "o", "connectome_randsign": "o", "connectome_nosign": "o", "block_shuffled": "s",
-        "shuffled": "s", "random": "s", "dense": "D", "gru": "^", "gru_recmatch": "^"}
+        "shuffled": "s", "random": "s", "dense": "D", "gru": "^", "gru_recmatch": "^", "transformer": "v",
+        "connectome_attnin": "o", "gru_attnin": "^", "transformer_attnin": "v", "block_shuffled_attnin": "s", "connectome_hybrid": "P"}
 
 
 def parse(fn):
     """-> (wiring, seed, env, window_tag) for results/hd/<wiring>_K1_s<seed>[_recmatch][_nyc][_b8_24|_b4_24|_mlp].json"""
-    m = re.match(r"(.+?)_K1_s(\d)(_recmatch)?(_nyc)?(_b8_24|_b4_24|_mlp)?$", fn)
+    m = re.match(r"(.+?)_K1_s(\d)(_recmatch|_attnin|_hybrid)?(_tn|_nyc)?(_b8_24|_b4_24|_mlp)?$", fn)
     if not m:
         return None
-    w = m.group(1) + ("_recmatch" if m.group(3) else "")
-    return w, int(m.group(2)), ("nyc" if m.group(4) else "arena"), (m.group(5) or "_b8_16").lstrip("_")
+    w = m.group(1) + (m.group(3) or "")
+    return w, int(m.group(2)), {None: "arena", "_nyc": "nyc", "_tn": "tn"}[m.group(4)], (m.group(5) or "_b8_16").lstrip("_")
 
 
 def hd_table():
@@ -61,12 +67,12 @@ def hd_table():
 
 def mse_table():
     rows = {}
-    for f in glob.glob("results/runs/*_K1_s?.json") + glob.glob("results/runs/*_K1_s?_recmatch.json"):
+    for f in glob.glob("results/runs/*_K1_s?.json") + glob.glob("results/runs/*_K1_s?_recmatch.json") + glob.glob("results/runs/*_K1_s?_attnin.json") + glob.glob("results/runs/*_K1_s?_hybrid.json"):
         fn = os.path.basename(f)[:-5]
-        m = re.match(r"(.+?)_K1_s(\d)(_recmatch)?$", fn)
+        m = re.match(r"(.+?)_K1_s(\d)(_recmatch|_attnin|_hybrid)?$", fn)
         if not m:
             continue
-        w = m.group(1) + ("_recmatch" if m.group(3) else "")
+        w = m.group(1) + (m.group(3) or "")
         d = json.load(open(f))
         if "test_mse" not in d or d.get("args", {}).get("env", "arena") not in ("arena", None):
             continue
@@ -128,7 +134,8 @@ def fig_schematic():
 def fig_main(hd, mse):
     fig, axes = plt.subplots(1, 2, figsize=(7.0, 3.0), gridspec_kw={"width_ratios": [1.15, 1]})
     ax = axes[0]
-    order = ["gru", "gru_recmatch", "dense", "connectome_nosign", "connectome_randsign", "connectome", "random", "block_shuffled", "shuffled"]
+    order = ["gru", "transformer", "gru_recmatch", "dense", "connectome_nosign", "connectome_randsign", "connectome", "connectome_hybrid",
+             "random", "block_shuffled", "shuffled", "connectome_attnin", "gru_attnin", "transformer_attnin"]
     for w in order:
         if w not in mse or (w, "arena", "b8_16") not in hd:
             continue
@@ -143,11 +150,11 @@ def fig_main(hd, mse):
     ax.annotate("worse predictors,\npath-integrating state", xy=(0.577, 8.4), xytext=(0.537, 2.5), fontsize=6.8,
                 arrowprops=dict(arrowstyle="-", color="#c0392b", lw=0.6), color="#c0392b")
     handles, labels = ax.get_legend_handles_labels()
-    ax.set_title("(a) Prediction vs. heading code (arena, 5 seeds)", loc="left")
+    ax.set_title("(a) Prediction vs. heading code (arena)", loc="left")
 
     ax = axes[1]
     xs = {"b8_16": 8, "b8_24": 16, "b4_24": 20}
-    for w in ["connectome", "block_shuffled", "shuffled", "random", "dense", "gru"]:
+    for w in ["connectome", "block_shuffled", "shuffled", "random", "dense", "gru", "transformer"]:
         pts = []
         for tag, x in xs.items():
             if (w, "arena", tag) in hd:
@@ -160,8 +167,8 @@ def fig_main(hd, mse):
     ax.set_xticks([8, 16, 20]); ax.set_xticklabels(["8 (8:16)", "16 (8:24)", "20 (4:24)"])
     ax.set_xlabel("dark steps (blind window)"); ax.set_ylabel("median heading error (deg)")
     ax.set_ylim(0, 46)
-    ax.set_title("(b) Dark duration (arena, 3 seeds)", loc="left")
-    fig.legend(handles, labels, loc="lower center", ncol=5, frameon=False, handletextpad=0.3, columnspacing=1.2, bbox_to_anchor=(0.5, -0.01))
+    ax.set_title("(b) Dark duration (arena)", loc="left")
+    fig.legend(handles, labels, loc="lower center", ncol=4, frameon=False, handletextpad=0.3, columnspacing=1.2, bbox_to_anchor=(0.5, -0.01))
     fig.tight_layout(w_pad=1.5, rect=(0, 0.13, 1, 1))
     fig.savefig(os.path.join(OUT, "main_result.pdf"), bbox_inches="tight")
     plt.close(fig)
@@ -172,18 +179,19 @@ def fig_homing():
     agg = {}
     for f in glob.glob("results/homing/*.json"):
         k = os.path.basename(f)[:-5]
-        m = re.match(r"(.+?)_K1_s(\d)(_recmatch)?_(arena|nyc_nyc)_(state|mlp|oracle|random|actions)(_tn)?$", k)
-        if not m or m.group(6):
+        m = re.match(r"(.+?)_K1_s(\d)(_recmatch|_attnin|_hybrid)?(_tn)?_(arena|nyc_nyc)_(state|mlp|oracle|random|actions)(_tn)?$", k)
+        if not m or m.group(7) or m.group(4):
             continue
         d = json.load(open(f))
-        w = m.group(1) + (m.group(3) or ""); env = "arena" if m.group(4) == "arena" else "nyc"; ro = m.group(5)
+        w = m.group(1) + (m.group(3) or ""); env = "arena" if m.group(5) == "arena" else "nyc"; ro = m.group(6)
         agg.setdefault((env, w, ro), []).append((d["success"], 100 * (1 - d["dist_final"] / d["dist_blind_start"])))
     rows = [("oracle pose (ceiling)", "connectome", "oracle", "#1e8449"), ("dead reckoning of actions", "connectome", "actions", "#52be80"),
             ("random actions (floor)", "connectome", "random", "#7f8c8d"),
             ("connectome state", "connectome", "state", COLOR["connectome"]), ("connectome, unsigned", "connectome_nosign", "state", COLOR["connectome_nosign"]),
             ("block-shuffled state", "block_shuffled", "state", COLOR["block_shuffled"]), ("degree-shuffled state", "shuffled", "state", COLOR["shuffled"]),
             ("random state", "random", "state", COLOR["random"]), ("dense state", "dense", "state", COLOR["dense"]),
-            ("GRU, param.-matched", "gru", "state", COLOR["gru"]), ("GRU, budget-matched", "gru_recmatch", "state", COLOR["gru_recmatch"])]
+            ("GRU, param.-matched", "gru", "state", COLOR["gru"]), ("GRU, budget-matched", "gru_recmatch", "state", COLOR["gru_recmatch"]),
+            ("Transformer, param.-matched", "transformer", "state", COLOR["transformer"])]
     fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.5), sharey=True)
     for ax, env, title in [(axes[0], "arena", "(a) Arena: 12 visible, 24 blind steps"), (axes[1], "nyc", "(b) NYC twin: 12 visible, 24 blind steps")]:
         ys, labels = [], []

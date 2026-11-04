@@ -152,3 +152,38 @@ def test_neuron_model_ablations_run_and_train(kw):
     if kw.get("gate"): assert m.Wg_raw.grad is not None and m.Wg_raw.grad.abs().sum() > 0 and m.param_breakdown()["recurrent"] == 2 * m.n_edges
     if kw.get("learn_alpha") and not kw.get("gate"): assert m.alpha_logit.grad is not None
     base = FlyBrain(conn, 24, 8, wiring="connectome", seed=3); assert m.n_edges == base.n_edges   # wiring unchanged
+
+
+# ---------------- transformer baseline, attention input, hybrid routing ----------------
+from wm2cx.transformer import TransformerWM, transformer_layers_for, transformer_params
+from wm2cx.student import AttnInput
+
+
+def test_transformer_matches_budget_and_is_causal():
+    conn = small_conn(); fb = FlyBrain(conn, 768, 8); L = transformer_layers_for(fb.n_params(), 768, 8, d_model=32)
+    m = TransformerWM(768, 8, 32, L); assert m.n_params() <= fb.n_params() < TransformerWM(768, 8, 32, L + 1).n_params()
+    assert transformer_params(32, L, 768, 8) == m.n_params()
+    x = torch.randn(2, 7, 768); a = torch.randint(0, 5, (2, 7)); v = torch.ones(2, 7); v[:, 3:5] = 0
+    zh, H = m(x, a, v); assert zh.shape == (2, 7, 8) and H.shape == (2, 7, 32)
+    x2 = x.clone(); x2[:, 5:] = torch.randn(2, 2, 768); zh2, _ = m(x2, a, v)
+    assert torch.allclose(zh[:, :5], zh2[:, :5], atol=1e-5)                       # causal: the future never changes the past
+    # closed-loop step reproduces the batched forward
+    h = m.init_state(2, "cpu"); hs = []
+    for t in range(7): h = m.step(h, x[:, t], a[:, t - 1] if t > 0 else torch.zeros_like(a[:, 0]), v[:, t]); hs.append(h)
+    assert torch.allclose(torch.stack(hs, 1), H, atol=1e-5)
+    pb = m.param_breakdown(); assert sum(pb[k] for k in ("recurrent", "input", "output", "other")) == pb["total"] and m.flops_per_step() > 0
+
+
+def test_attn_input_and_hybrid():
+    conn = small_conn()
+    m = FlyBrain(conn, 768, 8, in_mode="attn"); base = FlyBrain(conn, 768, 8)
+    assert isinstance(m.W_in, AttnInput) and m.param_breakdown()["input"] < base.param_breakdown()["input"] / 5 and m.flops_per_step() > 0
+    o = torch.randn(3, 768); assert m.W_in(o).shape == (3, SMALL["VIS"])
+    x = torch.randn(2, 5, 768); a = torch.randint(0, 5, (2, 5)); v = torch.ones(2, 5); v[:, 2:4] = 0
+    zh, H = m(x, a, v); assert zh.shape == (2, 5, 8) and torch.isfinite(H).all(); zh.pow(2).sum().backward(); assert m.W_in.q.grad is not None
+    hy = FlyBrain(conn, 768, 8, hybrid=True); assert hy.n_edges == base.n_edges and hy.G == len(np.unique(conn["cell_type"]))
+    zh, H = hy(x, a, v); zh.pow(2).sum().backward(); assert hy.h_gain.grad is not None and torch.isfinite(H).all()
+    # at zero gain the hybrid equals the plain student with the same seed
+    hy0 = FlyBrain(conn, 768, 8, hybrid=True, seed=7); b0 = FlyBrain(conn, 768, 8, seed=7)
+    with torch.no_grad(): hy0.W_in.load_state_dict(b0.W_in.state_dict()); hy0.W_out.load_state_dict(b0.W_out.state_dict()); hy0.W_act.load_state_dict(b0.W_act.state_dict())
+    assert torch.allclose(hy0(x, a, v)[0], b0(x, a, v)[0], atol=1e-6)

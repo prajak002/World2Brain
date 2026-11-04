@@ -4,11 +4,12 @@
 \paragraph{Two things that are easy to conflate}
 Our experiments pull apart two claims that usually travel together. The first is about a \emph{class} of topology.
 Connectome-scale sparse signed recurrence, trained only to predict a video model's latent, ends up holding a state
-that path-integrates: heading and position are linearly readable through 8 to 20 dark steps, and a GRU trained on the
-same objective, at either parameter budget, never forms this code, even when we look for it with a non-linear probe.
-We find this strong, because the GRU predicts the latent better. The code is not a by-product of prediction quality;
+that path-integrates: heading and position are linearly readable through 8 to 20 dark steps, and neither a GRU nor a
+causal transformer trained on the same objective at the same parameter budget forms this code, even when we look for
+it with a non-linear probe, and even when the input encoder is equalised. We find this strong, because both predict the
+latent better. The code is not a by-product of prediction quality;
 if anything it trades against it. The second claim is about the \emph{identity} of the real synapses, and here the
-evidence is modest: about one percent of latent error, 2\degree\ to 6\degree\ of heading, reproducible across seeds,
+evidence is modest: about one percent of latent error, \nConnBlockGapArena\ to \nConnBlockGapArenaDarkSixteen\degree\ of heading, reproducible across seeds,
 environments, data sizes and subgraphs, but never the cause of the effect and absent from the behavioural readouts.
 A reader who takes away only ``sparse signed recurrence integrates, and the fly's version is a little better'' has
 understood the paper.
@@ -17,8 +18,9 @@ understood the paper.
 We can offer a hypothesis but not yet a proof. A sparse signed graph at this scale has a large reservoir of slow,
 weakly coupled modes. The leaky update in \cref{eq:student} drives those modes with the action input, and the linear
 readout is free to leave them alone because they cost almost nothing in latent error. A gated unit with a dense
-$174^2$ or $762^2$ recurrence is pushed by the same objective to spend its capacity on prediction, and nothing in the
-loss rewards it for keeping an integral around. The probes on random and shuffled sparse graphs fit this picture: the
+$762^2$ recurrence, or a transformer that can re-read its visible past at every step, is pushed by the same objective
+to spend its capacity on prediction, and nothing in the loss rewards it for keeping an integral around; the transformer
+in particular has no reason to integrate when it can attend. The probes on random and shuffled sparse graphs fit this picture: the
 code appears whenever the recurrence is sparse, signed and large. The obvious next experiments, a spectral analysis
 of the trained $W$ and lesions of its slow modes, are left for future work.
 
@@ -26,11 +28,12 @@ of the trained $W$ and lesions of its slow modes, are left for future work.
 We list them in the order we think reviewers should weigh them. (i) The behavioural readouts are linear and that is
 where the result stops short: homing reaches 37\,\% on the NYC twin and 10\,\% on the arena against a 92 to 100\,\%
 ceiling, and goal-vector navigation does not beat random actions. A readout fit on more rollouts, or a recurrent
-readout, may close part of this gap, but we have not shown it. (ii) The information ceiling is trivial because turns
-are fixed-angle and actions are given in the dark. The turn-noise control in \cref{tab:homing} is a first step toward
-non-trivial integration; the full experiment with continuous turn angles remains to be run. (iii) The environments are
-synthetic, and on real handheld video no student beats a copy-last baseline. (iv) The teacher is ViT-B at 256\,px,
-the smaller \vjepa variant. (v) The NYC twin uses one location and a random, not geographic, episode split. (vi) The
+readout, may close part of this gap, but we have not shown it. (ii) On the fixed-turn arena the information ceiling is
+trivial because actions are given in the dark; the continuous-turn data remove that ceiling, but the actions are still
+given, and an experiment in which the student must estimate its own egomotion from vision alone remains to be done.
+(iii) The environments are synthetic, and on real handheld video no student beats a copy-last predictor; the
+real-video evidence is the heading probe, and it rests on an egomotion estimate rather than ground-truth odometry. (iv) The teacher is ViT-B at 256\,px,
+the smaller \vjepa variant. (v) The NYC twin uses one location with a geographic train/test split. (vi) The
 51 EPG neurons do not carry the heading code; the biological ring attractor does not emerge at this scale, and we do
 not claim it.
 
@@ -43,6 +46,6 @@ blueprint to be copied, and the controls are where most of the information is.
 \section{Conclusion}
 A video foundation model can be distilled into a world model whose recurrence is the fly's wiring diagram. The wiring
 makes it a worse predictor and a better integrator: the state keeps a linearly readable heading and position through
-the dark that a GRU trained on the same objective never forms, with a small, consistent advantage for the real
-synapses over shuffled ones. Turning that code into reliable blind behaviour is the open problem, and we release
+the dark that neither a GRU nor a transformer trained on the same objective forms, with a small, consistent advantage
+for the real synapses over shuffled ones. Turning that code into reliable blind behaviour is the open problem, and we release
 everything needed to work on it.

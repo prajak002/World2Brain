@@ -7,7 +7,6 @@ for t in range(24):
     im=Image.open(f"{R}/results/hq/nyc_ep4_t{t:02d}.png").convert("RGB").resize((640,640),Image.LANCZOS); b=io.BytesIO(); im.save(b,"JPEG",quality=82); imgs.append("data:image/jpeg;base64,"+base64.b64encode(b.getvalue()).decode())
 slim={"region":D["region"],"pos":D["pos"],"edges":D["edges"][:3500],"esign":D["esign"][:3500],"nyc":{k:D["nyc"][k] for k in ("act","actions","heading","match","z","zh")},"frames":imgs}
 html=r'''<title>World and Brain Side by Side</title>
-<meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap">
 <style>
 :root{--bg:#0d0f14;--bg2:#171a22;--fg:#eceae2;--fg2:#a09e95;--line:#2c3039;--fly:#4fc3c7;--ai:#e6a054;--dark:#ffb347;--vis:#56b4e9;--cx:#f0a940;--mb:#d55181;--out:#9085e9;--display:"Fraunces",Georgia,serif;--body:"Source Sans 3","Helvetica Neue",Arial,sans-serif;color-scheme:dark}

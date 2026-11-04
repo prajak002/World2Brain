@@ -21,3 +21,4 @@ data/*.npz
 data/raw/
 results/runs/*.pt
 logs/
+paper/main.pdf

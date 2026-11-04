@@ -94,4 +94,4 @@ repo `apiantonio/vjepa2.1-vit-base-384` and download on first use.
 
 ## 7. Next phase (2026-11-04)
 
-Plan to retarget the paper at a computer-vision venue with real-scene closed-loop navigation on 3D Gaussian splat twins of the phone clips, plus the note for the student collaborator (tasks, baselines, reading list): https://claude.ai/artifact/BNVrA1jfuugrpf77sZ4U51
+Plan to retarget the paper at a computer-vision venue with real-scene closed-loop navigation on 3D Gaussian splat twins of the phone clips, plus the note for the student collaborator (tasks, baselines, reading list).

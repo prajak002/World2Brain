@@ -13,14 +13,14 @@ def load(pattern):
     return {os.path.basename(f)[:-5]: json.load(open(f)) for f in sorted(glob.glob(pattern)) if "smoke" not in f}
 
 
-VARIANTS = ("_alphagate", "_alpha", "_gate", "_big", "_recmatch")     # model variants trained on the same data: shown as extra rows, not as datasets
+VARIANTS = ("_alphagate", "_alpha", "_gate", "_big", "_recmatch", "_attnin", "_hybrid")     # model variants trained on the same data: shown as extra rows, not as datasets
 
 
 def split_tag(name):
     """'gru_K1_s0_big' -> ('', '_big'); 'connectome_K1_s0_nyc' -> ('_nyc', ''); 'connectome_K1_s0_gate' -> ('', '_gate')."""
     m = re.match(r"^(.*)_K(\d+)_s(\d+)(.*)$", name); tag = m.group(4) if m else ""
-    for v in VARIANTS:
-        if tag.endswith(v): return tag[:-len(v)], v
+    for v in VARIANTS:                                                          # the variant may precede an evaluation tag: '_attnin_realvid'
+        if v in tag: return tag.replace(v, "", 1), v
     return tag, ""
 
 
@@ -129,7 +129,7 @@ def hd_split(n):
         if n.endswith(t): return n[:-len(t)], t
     return n, ""
 def hd_wiring(run):
-    m = re.match(r"^(.*)_K1_s(\d+)(_nyc)?$", run); return (m.group(1) + (m.group(3) or ""), int(m.group(2))) if m else (None, None)
+    m = re.match(r"^(.*?)_K1_s(\d+)(.*)$", run); return (m.group(1) + m.group(3), int(m.group(2))) if m else (None, None)   # trailing tags (_nyc, _tn, _attnin, ...) become part of the wiring label
 hd_base = {n: d for n, d in hd.items() if hd_split(n)[1] == ""}
 g = lambda d, k: f"{d[k]['heading_err_deg']:.1f} ({d[k]['heading_r2']:.2f})" if k in d else "-"
 gp = lambda d, k: f"{d[k]['pos_r2']:.2f}" if k in d else "-"

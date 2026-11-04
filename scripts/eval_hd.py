@@ -96,7 +96,7 @@ probe = ridge_r2 if a.probe == "ridge" else mlp_r2
 
 region = np.tile(conn["region"], args["n_brains"]); ctype = np.tile(conn["cell_type"], args["n_brains"])
 groups = {"all": np.ones(model.N, bool)}
-if args["wiring"] != "gru":
+if args["wiring"] not in ("gru", "transformer"):
     groups.update({"CX": region == "CX", "EPG": np.char.startswith(ctype, "EPG"), "VIS": region == "VIS", "MB": region == "MB"})
 if model.N > a.match_n:
     sub = np.zeros(model.N, bool); sub[np.random.default_rng(0).choice(model.N, a.match_n, replace=False)] = True; groups[f"all@{a.match_n}"] = sub

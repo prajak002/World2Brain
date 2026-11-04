@@ -1,14 +1,26 @@
 \section{Related work}
 \label{sec:related}
 
-\paragraph{Video world models and latent prediction}
-World models learn a latent transition $z_{t+1} = f(z_t, a_t)$ and use it to imagine and
-plan~\cite{ha2018world,hafner2023dreamerv3}. The joint-embedding predictive architecture replaces pixel reconstruction
-with prediction in a learned representation space~\cite{lecun2022path,bardes2024vjepa}; \vjepa scales this to internet
-video and adds an action-conditioned predictor for planning~\cite{assran2025vjepa2}. We treat \vjepa as a fixed
-teacher and ask what recurrent structure can carry its latent through time, in the spirit of knowledge
-distillation~\cite{hinton2015distilling} but into a fixed, non-trainable topology rather than a smaller network of the
-same family.
+\paragraph{Vision world models}
+Following the taxonomy of Yu \etal~\cite{yu2026seeing}, vision world models fall into four design families: sequential
+token generation~\cite{bruce2024genie}, diffusion-based generation~\cite{agarwal2025cosmos,bar2024nwm}, embedding
+prediction~\cite{lecun2022path,bardes2024vjepa,assran2025vjepa2,zhou2024dinowm,baldassarre2025dinoworld}, and latent
+state transition~\cite{ha2018world,hafner2023dreamerv3,micheli2023iris,zhang2023storm,robine2023twm}. Our student is an
+embedding-prediction model with a state-transition core: a frozen \vjepa encoder supplies the target space, as DINO-WM
+and DINO-world do with frozen DINO features~\cite{zhou2024dinowm,baldassarre2025dinoworld}, and a recurrent network
+carries the latent through time under actions, as the recurrent state-space models of Dreamer~\cite{hafner2023dreamerv3}
+and the transformer cores of IRIS, STORM and TWM~\cite{micheli2023iris,zhang2023storm,robine2023twm} do. The field's
+recurrent core is a free architectural choice sized by compute; ours is fixed by a wiring diagram. We therefore compare
+against the two cores a reviewer would ask for by name, a gated recurrent unit and a causal transformer predictor, both
+matched to the student's parameter budget, and against the trivial copy-last and constant predictors every world-model
+benchmark reports~\cite{bar2024nwm}. Knowledge distillation~\cite{hinton2015distilling} usually compresses a model into
+a smaller member of the same family; here the target is a fixed, signed, biologically sourced sparse graph.
+
+\paragraph{Navigation world models and embodied evaluation}
+Navigation World Models~\cite{bar2024nwm} plan trajectories in a diffusion video model and evaluate with the
+success-rate and SPL protocol of embodied navigation~\cite{anderson2018evaluation}; DINO-WM plans zero-shot in a frozen
+latent space~\cite{zhou2024dinowm}. We adopt the same metrics for blind homing and goal-vector navigation, and the same
+distinction between open-loop prediction and closed-loop control, which is where our behavioural results stop short.
 
 \paragraph{Connectome-constrained models}
 Whole-brain \emph{Drosophila} connectomes~\cite{dorkenwald2024neuronal,schlegel2024whole} with predicted neurotransmitter

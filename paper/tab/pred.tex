@@ -1,0 +1,20 @@
+\begin{tabular}{lcccccc}
+    \toprule
+    & \multicolumn{2}{c}{Arena (5 seeds)} & \multicolumn{2}{c}{Cont.\ turns (0 seeds)} & \multicolumn{2}{c}{NYC twin (3 seeds)} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+    wiring & MSE $\downarrow$ & cos $\uparrow$ & MSE $\downarrow$ & cos $\uparrow$ & MSE $\downarrow$ & cos $\uparrow$ \\
+    \midrule
+    GRU, parameter-matched & \textbf{0.434\pm0.004} & \textbf{0.72} & -- & -- & \textbf{0.609\pm0.003} & \textbf{0.56} \\
+    GRU, recurrent-budget-matched & 0.501\pm0.001 & 0.67 & -- & -- & -- & -- \\
+    dense & 0.562\pm0.004 & 0.63 & -- & -- & -- & -- \\
+    connectome, unsigned & 0.573\pm0.001 & 0.63 & -- & -- & -- & -- \\
+    connectome, random signs & 0.578\pm0.001 & 0.62 & -- & -- & -- & -- \\
+    \textbf{connectome} & 0.579\pm0.003 & 0.62 & -- & -- & 0.701\pm0.010 & 0.47 \\
+    random & 0.583\pm0.002 & 0.61 & -- & -- & 0.707\pm0.007 & 0.48 \\
+    block-shuffled & 0.585\pm0.005 & 0.61 & -- & -- & 0.726\pm0.014 & 0.45 \\
+    degree-shuffled & 0.610\pm0.002 & 0.59 & -- & -- & 0.731\pm0.005 & 0.45 \\
+    \midrule
+    copy last visible latent & 0.811 & -- & -- & -- & 1.558 & -- \\
+    constant mean & 0.992 & -- & -- & -- & 0.977 & -- \\
+    \bottomrule
+\end{tabular}

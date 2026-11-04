@@ -1,10 +1,15 @@
 import argparse, json, time, numpy as np, torch, os
 from wm2cx.student import FlyBrain, GRUBaseline, gru_hidden_for, WIRINGS
+from wm2cx.transformer import TransformerWM, transformer_layers_for
 from wm2cx.data import load_split, blackout, parse_windows, window_errors
 from wm2cx.connectome import load as load_conn
 
 p = argparse.ArgumentParser()
-p.add_argument("--wiring", default="connectome", choices=WIRINGS + ("gru",)); p.add_argument("--n_brains", type=int, default=1)
+p.add_argument("--wiring", default="connectome", choices=WIRINGS + ("gru", "transformer")); p.add_argument("--n_brains", type=int, default=1)
+p.add_argument("--d_model", type=int, default=256, help="transformer baseline width")
+p.add_argument("--n_layers", type=int, default=0, help="transformer baseline depth; 0 = deepest model at --d_model with <= the FlyBrain parameter count of this config")
+p.add_argument("--in_mode", default="linear", choices=["linear", "attn"], help="attn: cross-attention input encoder instead of the linear W_in (GRU / transformer budgets follow)")
+p.add_argument("--hybrid", type=int, default=0, help="connectome recurrence plus one shared attention layer over cell-type-pooled activity per step (ablation)")
 p.add_argument("--epochs", type=int, default=30); p.add_argument("--bs", type=int, default=32); p.add_argument("--lr", type=float, default=2e-3)
 p.add_argument("--H", type=int, default=8); p.add_argument("--seed", type=int, default=0); p.add_argument("--device", default="mps")
 p.add_argument("--k", type=int, default=256)
@@ -37,11 +42,14 @@ if a.val > 0:  # validation split carved from the training episodes (fixed by se
 E, T = tr["obs"].shape[:2]; windows = parse_windows(a.eval_windows, T); obs_dim = tr["obs"].shape[-1]
 print(f"train eps {E} val eps {0 if va is None else len(va['obs'])} test eps {len(te['obs'])} PCA{a.k} explained {lat.explained:.3f}")
 conn = load_conn(a.conn)
-fly = FlyBrain(conn, obs_dim, a.k, wiring=a.wiring if a.wiring != "gru" else "connectome", n_brains=a.n_brains, seed=a.seed, vis_flag=bool(a.vis_flag), in_rank=a.in_rank,
-               learn_alpha=bool(a.learn_alpha), gate=bool(a.gate))
+fly = FlyBrain(conn, obs_dim, a.k, wiring=a.wiring if a.wiring not in ("gru", "transformer") else "connectome", n_brains=a.n_brains, seed=a.seed, vis_flag=bool(a.vis_flag), in_rank=a.in_rank,
+               learn_alpha=bool(a.learn_alpha), gate=bool(a.gate), in_mode=a.in_mode, hybrid=bool(a.hybrid))
 if a.wiring == "gru":
     if a.gru_hidden <= 0: a.gru_hidden = gru_hidden_for(fly.n_params(), obs_dim, a.k, vis_flag=bool(a.vis_flag))
     model = GRUBaseline(obs_dim, a.k, a.gru_hidden, vis_flag=bool(a.vis_flag)); del fly
+elif a.wiring == "transformer":
+    if a.n_layers <= 0: a.n_layers = transformer_layers_for(fly.n_params(), obs_dim, a.k, a.d_model, vis_flag=bool(a.vis_flag))
+    model = TransformerWM(obs_dim, a.k, a.d_model, a.n_layers, vis_flag=bool(a.vis_flag)); del fly
 else:
     model = fly
 model.to(dev); pb = model.param_breakdown(); print("neurons", model.N, "params", pb)
