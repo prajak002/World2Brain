@@ -91,3 +91,7 @@ To add new phone clips: `python scripts/ingest_video.py --videos a.mp4 b.mp4 --o
 Windows laptop (RTX 3050 4 GB, miniconda base now carries `torch 2.13.0+cu130`), Vast.ai RTX 4090 box for the main run
 (destroyed 2026-11-03), Kaggle as the mirror for checkpoints and data. The V-JEPA weights come from the Hugging Face
 repo `apiantonio/vjepa2.1-vit-base-384` and download on first use.
+
+## 7. Next phase (2026-11-04)
+
+Plan to retarget the paper at a computer-vision venue with real-scene closed-loop navigation on 3D Gaussian splat twins of the phone clips, plus the note for the student collaborator (tasks, baselines, reading list): https://claude.ai/artifact/BNVrA1jfuugrpf77sZ4U51

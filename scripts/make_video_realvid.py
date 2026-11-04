@@ -107,7 +107,9 @@ for L in layers:
     xy[idx] = np.array(cent[L]) + np.stack([rr * np.cos(th) * 1.1, rr * np.sin(th)], 1)
 pre, post, sign = models[0].e_pre.cpu().numpy(), models[0].e_post.cpu().numpy(), models[0].e_sign.cpu().numpy()
 keep = r0.choice(len(pre), 1500, replace=False); segs = np.stack([xy[pre[keep] % len(region)], xy[post[keep] % len(region)]], 1); sg = sign[keep]
-amp = [np.percentile(np.abs(H), 99) for H in Hs]; is_gru = [m.wiring == "gru" for m in models]
+amp = [np.percentile(np.abs(H), 99) for H in Hs]
+gru_order = np.argsort(-np.abs(Hs[1]).mean(0)) if len(Hs) > 1 else None   # GRU units sorted by mean |activity| over the episode (fixed across frames)
+is_gru = [m.wiring == "gru" for m in models]
 
 # ------------------------------------------------------------------ video
 BG, INK, MUTED, RED, TEACH = "#0b0d12", "#f2f2f2", "#9aa3b2", "#ff6b6b", "#7ad7f0"; SCOL = ["#ffb347", "#c77dff"]
@@ -125,6 +127,9 @@ def draw(t):
     blind = b0 <= t < b1
     head(0, "WORLD MODEL (V-JEPA 2.1 teacher)", TEACH); head(1, "DISTILLED FLY CONNECTOME", SCOL[0]); head(2, "DISTILLED GRU (same loss, same budget)", SCOL[1])
     rowlabel(0.73, "S E E S"); rowlabel(0.41, "T H I N K S"); rowlabel(0.14, "N A V I G A T E S")
+    fig.text(0.035, 0.875, "SEES: what each network receives, and how its internal units respond", color=MUTED, fontsize=9, ha="left")
+    fig.text(0.035, 0.535, "THINKS: the teacher's 256-d summary of the scene, step by step; each student must predict it, even when the picture is cut", color=MUTED, fontsize=9, ha="left")
+    fig.text(0.035, 0.255, "NAVIGATES: heading and position were never trained; we read them out of each network's activity with a linear probe", color=MUTED, fontsize=9, ha="left")
     fig.text(0.5, 0.905, f"real phone clip: {sname}     t = {t:02d} / {T - 1}     estimated action: {ACTION[int(acts[t])]}     " +
              ("VISION CUT: the students carry the world forward from the action alone" if blind else "vision on"), ha="center", color=RED if blind else INK, fontsize=12.5)
     ax = AX["see0"]; fr = frames[t].astype(float) * (0.18 if blind else 1.0); ax.imshow(fr.astype(np.uint8), aspect="auto"); ax.set_xticks([]); ax.set_yticks([])
@@ -137,9 +142,11 @@ def draw(t):
             for L in layers: ax.text(cent[L][0], 1.45, f"{L}  ({(region == L).sum()})", ha="center", color=LCOL[L], fontsize=9)
             ax.set_xlim(-1.6, 9.6); ax.set_ylim(-1.5, 1.8); ax.axis("off"); ax.set_title("6,935 FlyWire neurons on 91,663 real synapses; colour = activity", color=INK, fontsize=10, loc="left")
         else:
-            n = len(H); cols = int(np.ceil(np.sqrt(n * 1.4))); rows = int(np.ceil(n / cols)); grid = np.full(rows * cols, np.nan); grid[:n] = H
-            ax.imshow(grid.reshape(rows, cols), cmap="coolwarm", vmin=-amp[1], vmax=amp[1], aspect="auto", interpolation="nearest"); ax.set_xticks([]); ax.set_yticks([])
-            ax.set_title(f"{n} GRU hidden units (dense {n}×{n} recurrence); colour = activity", color=INK, fontsize=10, loc="left")
+            n = len(H); order = gru_order
+            ax.imshow(H[order][None, :], cmap="coolwarm", vmin=-amp[1], vmax=amp[1], aspect="auto", interpolation="nearest", extent=[0, n, 0, 1]); ax.set_yticks([]); ax.set_xlim(0, n)
+            ax.set_xticks([0, n // 2, n]); ax.set_xticklabels(["unit 1", f"unit {n // 2}", f"unit {n}"]); ax.tick_params(colors=MUTED, labelsize=8)
+            ax.set_title(f"{n} GRU hidden units: one vector, no anatomy (sorted once by mean activity); colour = activity", color=INK, fontsize=10, loc="left")
+            ax.text(n / 2, -0.45, "each column is one hidden unit; red = positive, blue = negative. The GRU has no populations, so there is nothing to lay out.", ha="center", va="top", color=MUTED, fontsize=8, clip_on=False)
     ax = AX["eye"]; ax.imshow(eye[t] if not blind else np.zeros_like(eye[t]), aspect="auto"); ax.set_xticks([]); ax.set_yticks([]); ax.set_title("what the students get: fly-eye 32×8", color=MUTED, fontsize=7, pad=2)
     ax = AX["think0"]; ax.plot(traj_t[:, 0], traj_t[:, 1], color=TEACH, lw=1.2, alpha=0.5); ax.plot(traj_t[:t + 1, 0], traj_t[:t + 1, 1], color=TEACH, lw=2.2)
     ax.scatter(traj_t[t, 0], traj_t[t, 1], s=80, color=TEACH, zorder=5, edgecolors=INK); ax.scatter(traj_t[b0:b1, 0], traj_t[b0:b1, 1], s=14, color=RED, zorder=4)

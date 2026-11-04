@@ -108,6 +108,7 @@ for L in layers:
 pre, post, sign = models[0].e_pre.cpu().numpy(), models[0].e_post.cpu().numpy(), models[0].e_sign.cpu().numpy()
 keep = rng.choice(len(pre), 1500, replace=False); segs = np.stack([xy[pre[keep] % len(region)], xy[post[keep] % len(region)]], 1); sg = sign[keep]
 amp = [np.percentile(np.abs(H), 99) for H in Hs]
+gru_order = np.argsort(-np.abs(Hs[1]).mean(0)) if len(Hs) > 1 else None   # GRU units sorted by mean |activity| over the episode (fixed across frames)
 is_gru = [m.wiring == "gru" for m in models]
 
 # ------------------------------------------------------------------ figure
@@ -133,6 +134,9 @@ def draw(t):
     blind = b0 <= t < b1
     head(0, "WORLD MODEL (V-JEPA 2.1 teacher)", TEACH); head(1, "DISTILLED FLY CONNECTOME", SCOL[0]); head(2, "DISTILLED GRU (same loss, same budget)", SCOL[1])
     rowlabel(0.73, "S E E S"); rowlabel(0.41, "T H I N K S"); rowlabel(0.14, "N A V I G A T E S")
+    fig.text(0.035, 0.875, "SEES: what each network receives, and how its internal units respond", color=MUTED, fontsize=9, ha="left")
+    fig.text(0.035, 0.535, "THINKS: the teacher's 256-d summary of the scene, step by step; each student must predict it, even when the picture is cut", color=MUTED, fontsize=9, ha="left")
+    fig.text(0.035, 0.255, "NAVIGATES: heading and position were never trained; we read them out of each network's activity with a linear probe", color=MUTED, fontsize=9, ha="left")
     fig.text(0.5, 0.905, f"t = {t:02d} / {T - 1}     action: {ACTION[int(acts[t])]}     " + ("VISION CUT: the students must carry the world forward from the action alone" if blind else "vision on"),
              ha="center", color=RED if blind else INK, fontsize=13)
     # ---- SEES
@@ -147,9 +151,11 @@ def draw(t):
             ax.set_xlim(-1.6, 9.6); ax.set_ylim(-1.5, 1.8); ax.axis("off")
             ax.set_title("6,935 FlyWire neurons on 91,663 real synapses; colour = activity", color=INK, fontsize=10, loc="left")
         else:
-            n = len(H); cols = int(np.ceil(np.sqrt(n * 1.4))); rows = int(np.ceil(n / cols)); grid = np.full(rows * cols, np.nan); grid[:n] = H
-            ax.imshow(grid.reshape(rows, cols), cmap="coolwarm", vmin=-amp[1], vmax=amp[1], aspect="auto", interpolation="nearest"); ax.set_xticks([]); ax.set_yticks([])
-            ax.set_title(f"{n} GRU hidden units (dense {n}×{n} recurrence); colour = activity", color=INK, fontsize=10, loc="left")
+            n = len(H); order = gru_order
+            ax.imshow(H[order][None, :], cmap="coolwarm", vmin=-amp[1], vmax=amp[1], aspect="auto", interpolation="nearest", extent=[0, n, 0, 1]); ax.set_yticks([]); ax.set_xlim(0, n)
+            ax.set_xticks([0, n // 2, n]); ax.set_xticklabels(["unit 1", f"unit {n // 2}", f"unit {n}"]); ax.tick_params(colors=MUTED, labelsize=8)
+            ax.set_title(f"{n} GRU hidden units: one vector, no anatomy (sorted once by mean activity); colour = activity", color=INK, fontsize=10, loc="left")
+            ax.text(n / 2, -0.45, "each column is one hidden unit; red = positive, blue = negative. The GRU has no populations, so there is nothing to lay out.", ha="center", va="top", color=MUTED, fontsize=8, clip_on=False)
     ax = AX["eye"]; eye = raw["obs"][ep, t] if not blind else np.zeros_like(raw["obs"][ep, t]); ax.imshow(eye, aspect="auto"); ax.set_xticks([]); ax.set_yticks([])
     ax.set_title("what the students get: fly-eye 32×8", color=MUTED, fontsize=7, pad=2)
     # ---- THINKS
