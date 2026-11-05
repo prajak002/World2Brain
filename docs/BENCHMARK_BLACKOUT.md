@@ -25,6 +25,7 @@ arena to a city twin to real handheld video, so the claim is not tied to one sim
    random outbound policy    |   actions are still fed to the student              |   latent re-entry error
 ```
 
+* Success radius: 1 unit on the arena in run 2; **2 units for the sweep** (3.3 steps, the NYC ratio of 12 m / 3 m), fixed before the L4 run after the Mac pilot showed the 1-unit radius punishes one-step readout error.
 * `t_vis = 12` steps of vision, as in training. Blackout length `k ∈ {8, 16, 24, 30, 40}`, fixed before any result is
   seen (pre-registered). 40 is beyond the training blackout window, which tests extrapolation.
 * The student receives the true action at every step and a black (zero) frame during the blackout. No teacher, no
