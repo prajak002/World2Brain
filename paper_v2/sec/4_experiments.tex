@@ -124,8 +124,10 @@ the same neurons predicts better than the connectome (0.562 vs 0.579) but integr
 A linear readout of the connectome state drives blind homing to \nConnNycSucc\ success on NYC and \nConnArenaSucc\ on
 the arena (\cref{tab:homing}, \cref{fig:homing}), well above the random-action floor and the GRU (\nGruNycSucc, \nGruArenaSucc) but far
 below the dead-reckoning ceiling (0.92, 1.00). Block-shuffled homes slightly better than the real wiring. Goal-vector
-navigation toward a decoded goal does not beat random actions. The controller is not the bottleneck (the oracle pose
-reaches the ceiling); the readout is.
+navigation toward a decoded goal (\cref{tab:goalnav}) reaches 0.18 success on NYC streets for the connectome (0.27 with
+an MLP readout) against 0.06 for random wiring, 0.11 for the GRU, 0.00 for random actions and 0.83 for the oracle pose
+with the same bumper controller; a 3- or 5-step vision cut changes it by at most 0.03. The controller is not the
+bottleneck (the oracle reaches 0.83); the readout is. Latent-cost MPC on the same students fails outright (\cref{sec:suppl-plan}).
 
 \subsection{Benchmark 4: real handheld video}
 \label{sec:realvid}
