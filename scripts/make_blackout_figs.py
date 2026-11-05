@@ -23,7 +23,7 @@ for f in glob.glob("results/homing/*_k*.json"):
     d = json.load(open(f)); m = re.match(r"^(.*)_K1_s(\d+)(_tn)?(_nyc)?$", d["run"])
     if not m: continue
     w = m.group(1); env = d["env"]
-    if env == "arena" and bool(m.group(3)) != bool(a.tn): continue
+    if env == "arena" and (d.get("turn_noise", 0) > 0) != bool(a.tn): continue
     ro = d["readout"]; k = d["t_blind"]
     succ = [float(x < d["radius"]) for x in d["per_episode_final"]]
     key = (env, w if ro in ("state", "mlp") else ro, ro, k); rows.setdefault(key, []).append((succ, d.get("per_episode_drift", [])))
@@ -32,6 +32,13 @@ def ci(x):
     x = np.asarray(x, float); b = [rng.choice(x, len(x)).mean() for _ in range(a.boot)]
     return x.mean(), np.percentile(b, 2.5), np.percentile(b, 97.5)
 
+rows2 = {}  # T2 Continue: (env, wiring/readout, k) -> list of (success, spl) per seed
+for f in glob.glob("results/goalnav/*_bumper_k*.json"):
+    d = json.load(open(f)); m = re.match(r"^(.*)_K1_s(\d+)(_nyc)?$", d["run"])
+    if not m: continue
+    w = m.group(1) if d["readout"] in ("state", "mlp") else d["readout"]
+    if d["readout"] in ("state", "mlp") and d["readout"] != a.readout: continue
+    rows2.setdefault((d["env"], w, d["blackout"]), []).append((d["success"], d["spl"]))
 envs = [e for e in ("arena", "nyc") if any(k[0] == e for k in rows)]
 if not envs: raise SystemExit("no results/homing/*_k*.json yet")
 ks = sorted({k[3] for k in rows}); lines = ["| world | row | " + " | ".join(f"k={k}" for k in ks) + " |", "|---|---|" + "---|" * len(ks)]
@@ -56,6 +63,19 @@ for j, env in enumerate(envs):
     A2.set(xlabel="blackout length k (steps)", ylabel="decoded position drift at end (units)", title=A1.get_title())
     A1.grid(alpha=0.3); A2.grid(alpha=0.3)
 ax1[0, -1].legend(fontsize=7, loc="upper right"); ax2[0, -1].legend(fontsize=7)
+if rows2:
+    fig3, ax3 = plt.subplots(1, len(envs), figsize=(4.2 * len(envs), 3.4), squeeze=False); ks2 = sorted({k[2] for k in rows2})
+    lines += ["", "T2 Continue (goal seen, then k dark steps; success, mean over seeds)", "| world | row | " + " | ".join(f"k={k}" for k in ks2) + " |", "|---|---|" + "---|" * len(ks2)]
+    for j, env in enumerate(envs):
+        A = ax3[0, j]
+        for w in ["oracle", "random"] + list(NAMES):
+            pts = [(k, np.mean([x[0] for x in rows2[(env, w, k)]])) for k in ks2 if (env, w, k) in rows2]
+            if not pts: continue
+            st = dict(ls="--", color="0.6") if w == "oracle" else dict(ls="--", color="0.35") if w == "random" else dict(ls="-", marker="o", color=COL[w], lw=2 if w == "connectome" else 1.3)
+            A.plot([k for k, _ in pts], [v for _, v in pts], label={"oracle": "oracle goal vector", "random": "random actions"}.get(w, NAMES.get(w, w)), **st)
+            lines.append(f"| {env} | {NAMES.get(w, w)} | " + " | ".join(f"{v:.2f}" for _, v in pts) + " |")
+        A.set(xlabel="blackout length k (steps)", ylabel="goal success", ylim=(-0.02, 1.02), title=("arena" if env == "arena" else "NYC twin") + ", T2 continue"); A.grid(alpha=0.3)
+    ax3[0, -1].legend(fontsize=7); fig3.tight_layout(); os.makedirs(a.out, exist_ok=True); fig3.savefig(f"{a.out}/blackout_continue.pdf")
 os.makedirs(a.out, exist_ok=True)
 fig1.tight_layout(); fig1.savefig(f"{a.out}/blackout_success.pdf"); fig2.tight_layout(); fig2.savefig(f"{a.out}/blackout_drift.pdf")
 open("results/blackout_table.md", "w").write("\n".join(lines) + "\n"); print("\n".join(lines)); print(f"wrote {a.out}/blackout_success.pdf, {a.out}/blackout_drift.pdf, results/blackout_table.md")
