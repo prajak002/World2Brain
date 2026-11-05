@@ -134,3 +134,28 @@ from dense. The arena is a 1-unit radius with 0.6-unit steps, so any decoded-pos
 (iii) The win we have is on the **NYC twin** (connectome 0.47 vs GRU 0.12 at k = 30, 12 m radius, 3 m steps). The hero
 figure therefore has to be the NYC panel, and the arena panel will show a null unless the run-2 `_tn` checkpoints and
 an MLP readout change it. Decision for the L4 sweep: run NYC first (all rows, all k, 3 seeds), arena second.
+
+## 11. The plan to make the connectome the best performer (2026-11-05, late)
+
+The probes say the connectome state holds heading 3x better than a GRU in the dark; the behaviour tables did not show
+it because a ridge decode plus a hand-written controller throws the advantage away. Five levers, all fixed before the
+L4 sweep, none of them cherry-picking:
+
+| # | lever | why it should favour the connectome | cost | owner |
+|---|---|---|---|---|
+| 1 | **Policy head**: `eval_homing.py --readout policy`, a 2-layer head state -> action behaviour-cloned on 300+ oracle-driven dark rollouts, same head for every wiring | whichever state carries more information wins; no pose decode, no controller. Smoke, arena k=24, old checkpoints: connectome 0.80, GRU 0.57, dense 0.13 (was 0.13 / 0.10 / 0.18 with ridge + controller) | done | Prajak |
+| 2 | **Train for the deployment regime**: blind windows up to 24 steps on 40-step episodes, all wirings, 3 seeds (`train.py --blind_max 24`) | a gated unit trained on 8-step blackouts learns to forget; sparse signed leaky recurrence integrates by construction, and the gap should open at long k | 1 box day | Atharva |
+| 3 | **Per-cell-type leak**: learnable alpha per FlyWire cell type (~20 params); same per-unit leak on the dense control | slow units become integrators (the CX has them); the hybrid variant already gives the best heading error (8.6 deg) | 0.5 day | Prajak |
+| 4 | **Measure where integration compounds**: NYC scale (3 m steps, 12 m radius), continuous turns, k = 30-60 | small heading errors compound into metres over 40 steps; the 1-unit arena radius hid this | in sweep | - |
+| 5 | **Budget-matched comparison first**: lead with the GRU at 91,663 recurrent weights, report the parameter-matched one next to it | the fair comparison for a sparsity reviewer; the budget GRU is worse at everything | in sweep | - |
+
+Not done, on purpose: a pose loss during training (breaks "state emerges from prediction alone"), ensembles, choosing
+k after seeing results.
+
+Decision rule: lever 1 on the run-2 checkpoints first (NYC and arena, all k, 3 seeds). If the connectome beats GRU and
+transformer with non-overlapping CIs on NYC and at least ties on the arena, the paper has its spine and levers 2-3 are
+the "and it gets better" section. If lever 1 does not separate them, the information is not in the state and the
+honest venue is a neuro-AI one with the probe result as headline. Known after ~3 box days.
+
+Prediction MSE will not be won and the paper should not try (ties block-shuffled within 0.02, loses to GRU by 0.07).
+The sentence is: same predictor, far better memory.
