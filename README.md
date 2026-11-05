@@ -290,14 +290,14 @@ That is main-track material, not a spotlight. The items below are ordered by lev
 | # | item | why it matters | cost | status |
 |---|---|---|---|---|
 | 1 | Finish run 2 (`tn nyc hd homing summary`, then realvid) and regenerate `num.tex` | the only positive claim has no numbers yet | tonight, L4 | running |
-| 2 | Reframe abstract / intro around the negative prediction result + the state finding; state the h8 tie with random wiring | reviewers will rebuild the MSE table | 1 day | open (#14) |
-| 3 | Unidirectional LSTM at the same budget, 3 seeds | pre-empts "why only GRU"; expected within noise of GRU | 15 min, L4 | open (#15) |
-| 4 | A task the connectome **wins**, not just encodes: blind homing on continuous turns, longer blackouts (8:24, 4:24), heading under action noise | a spotlight needs an outright win against the matched GRU | 1-2 days | partly in run 2 (#16) |
-| 5 | Closed-loop navigation on real scenes: 3D Gaussian splat twins of the phone clips (COLMAP + Splatfacto/gsplat), env wrapper, planner with blackout stretches, SPL / success / collision; fix the goal-latent cost first (0 % even with oracle dynamics) | the computer-vision result a CVPR audience expects; the one place dead-reckoning state can beat raw prediction | 1-2 weeks | open (#17, #9) |
-| 6 | A distillation objective that uses the structure: auxiliary dead-reckoning loss on CX only, or a contrastive across-blackout term; report as a design, not a by-product | turns "heading is decodable" into "the circuit was trained as a path integrator" | 1 day each | open (#18) |
+| 2 | Reframe abstract / intro around the negative prediction result + the state finding; state the h8 tie with random wiring | reviewers will rebuild the MSE table | 1 day | open (#17) |
+| 3 | Unidirectional LSTM at the same budget, 3 seeds | pre-empts "why only GRU"; expected within noise of GRU | 15 min, L4 | open (#24) |
+| 4 | A task the connectome **wins**, not just encodes: blind homing on continuous turns, longer blackouts (8:24, 4:24), heading under action noise | a spotlight needs an outright win against the matched GRU | 1-2 days | partly in run 2 (#18) |
+| 5 | Closed-loop navigation on real scenes: 3D Gaussian splat twins of the phone clips (COLMAP + Splatfacto/gsplat), env wrapper, planner with blackout stretches, SPL / success / collision; fix the goal-latent cost first (0 % even with oracle dynamics) | the computer-vision result a CVPR audience expects; the one place dead-reckoning state can beat raw prediction | 1-2 weeks | open (#20, #9) |
+| 6 | A distillation objective that uses the structure: auxiliary dead-reckoning loss on CX only, or a contrastive across-blackout term; report as a design, not a by-product | turns "heading is decodable" into "the circuit was trained as a path integrator" | 1 day each | open (#21) |
 | 7 | Scale the claim beyond one graph: ablation stage on the new controls (min_syn 1 / region sets), K=1-3 with CIs, a second connectome (larval CNS or hemibrain) | "one graph, one species" is the first attack | 2-3 GPU days | open (#19) |
-| 8 | Larger teacher (ViT-L, 384 px) and a second real-odometry dataset (RECON / SCAND) for the real-video stage | removes the single-teacher and flow-estimated-action caveats | 1-2 GPU days + data | open (#20) |
-| 9 | Graph neural network student on the real edges (vector node state, typed message MLP, same budget), run on all three wirings | gives the real graph capacity without changing who talks to whom; separates capacity from wiring | 1 week, L4 | open (#21, Atharva) |
+| 8 | Larger teacher (ViT-L, 384 px) and a second real-odometry dataset (RECON / SCAND) for the real-video stage | removes the single-teacher and flow-estimated-action caveats | 1-2 GPU days + data | open (#22) |
+| 9 | Graph neural network student on the real edges (vector node state, typed message MLP, same budget), run on all three wirings | gives the real graph capacity without changing who talks to whom; separates capacity from wiring | 1 week, L4 | open (#23, Atharva) |
 
 ### Owners (2026-11-05)
 
@@ -305,13 +305,13 @@ That is main-track material, not a spotlight. The items below are ordered by lev
 |---|---|---|---|
 | Run 2 on the L4 (tn, nyc, probes, homing, real video) and `num.tex` | Prajak | #1-#13 | `scripts/run_l4.sh`, `scripts/make_paper_tables.py` |
 | Closed-loop navigation on the NYC digital twin (planner goal cost, blackout-in-the-loop) | Prajak | #9 | `scripts/eval_plan.py`, `scripts/eval_goalnav.py` |
-| A task the connectome wins outright | Atharva | #16 | `scripts/eval_homing.py`, `scripts/eval_hd.py`, run 2 `_tn` / `_b8_24` outputs |
-| Graph neural network student (message passing on the connectome) | Atharva | #21 | `wm2cx/student.py` (`FlyBrain`), `wm2cx/transformer.py` as the template for a new `--wiring` |
-| Closed-loop navigation on real crowded-scene video (splat twins of the phone clips) | Priyanshi | #17 | `scripts/ingest_video.py`, `data/realvid_all.npz`, `wm2cx/env.py` interface |
-| LSTM baseline at the same budget | Priyanshi | #15 | `scripts/train.py --wiring gru` path, `wm2cx/student.py::gru_hidden_for` |
-| Reframe abstract / intro around the negative result | Amitava sir | #14 | `paper_v2/sec/0_abstract.tex`, `sec/1_intro.tex`, scorecard in `sec/4_experiments.tex` |
+| A task the connectome wins outright | Atharva | #18 | `scripts/eval_homing.py`, `scripts/eval_hd.py`, run 2 `_tn` / `_b8_24` outputs |
+| Graph neural network student (message passing on the connectome) | Atharva | #23 | `wm2cx/student.py` (`FlyBrain`), `wm2cx/transformer.py` as the template for a new `--wiring` |
+| Closed-loop navigation on real crowded-scene video (splat twins of the phone clips) | Priyanshi | #20 | `scripts/ingest_video.py`, `data/realvid_all.npz`, `wm2cx/env.py` interface |
+| LSTM baseline at the same budget | Priyanshi | #24 | `scripts/train.py --wiring gru` path, `wm2cx/student.py::gru_hidden_for` |
+| Reframe abstract / intro around the negative result | Amitava sir | #17 | `paper_v2/sec/0_abstract.tex`, `sec/1_intro.tex`, scorecard in `sec/4_experiments.tex` |
 
-### Graph neural network student (for Atharva; issue #21)
+### Graph neural network student (for Atharva; issue #23)
 
 **What the student is now.** One sparse recurrent layer: `h_{t+1} = (1-a) h_t + a tanh(g (W h_t + W_in o_t + W_act a_t + b))`
 with `W` an edge list of 91,663 signed scalars (`W_ij = s_ij softplus(w_ij)`, sign fixed). In GNN terms that is already
@@ -334,7 +334,7 @@ beats the GRU only on the real graph the wiring matters; if it beats the GRU on 
 function, not the connectome. Both outcomes are publishable, but they are different papers. Also report `d = 1` with
 the learned `phi` (is it the vector state or the message MLP that helps?).
 
-**Why it could be the outright win (#16).** The scalar student loses to the GRU because its only free parameters on the
+**Why it could be the outright win (#18).** The scalar student loses to the GRU because its only free parameters on the
 graph are 91,663 magnitudes; the GRU has 0.7 M recurrent weights. A GNN gives the real graph vector capacity while
 keeping which neurons talk to which. If sum-aggregated typed messages on the CX ring recover heading *and* prediction,
 the paper has its win. If they do not, the finding "capacity on the real graph still loses" is the cleaner negative.
