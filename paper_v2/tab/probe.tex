@@ -1,0 +1,20 @@
+\begin{tabular}{lcccccc}
+    \toprule
+    & \multicolumn{2}{c}{Arena} & \multicolumn{2}{c}{Continuous turns} & \multicolumn{2}{c}{NYC twin} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+    wiring & heading err & pos $R^2$ & heading err & pos $R^2$ & heading err & pos $R^2$ \\
+    \midrule
+    GRU, parameter-matched & 30.6\pm0.6 & 0.41\pm0.01 & -- & -- & 45.4\pm2.6 & 0.25\pm0.01 \\
+    GRU, recurrent-budget-matched & 35.5\pm0.7 & 0.30\pm0.01 & -- & -- & -- & -- \\
+    dense & 21.3\pm0.7 & 0.68\pm0.01 & -- & -- & -- & -- \\
+    connectome, unsigned & 13.8\pm0.8 & 0.88\pm0.01 & -- & -- & -- & -- \\
+    connectome, random signs & 9.2\pm1.3 & \textbf{0.94\pm0.01} & -- & -- & -- & -- \\
+    \textbf{connectome} & \textbf{9.1\pm1.2} & 0.94\pm0.01 & -- & -- & \textbf{9.4\pm0.7} & \textbf{0.94\pm0.01} \\
+    random & 12.9\pm0.7 & 0.88\pm0.01 & -- & -- & 15.1\pm0.7 & 0.89\pm0.00 \\
+    block-shuffled & 10.8\pm0.8 & 0.93\pm0.01 & -- & -- & 10.1\pm1.1 & 0.94\pm0.02 \\
+    degree-shuffled & 12.7\pm0.6 & 0.89\pm0.02 & -- & -- & 14.3\pm2.0 & 0.84\pm0.01 \\
+    \midrule
+    actions only (linear floor) & 40.1 & 0.54 & -- & -- & 22.6 & 0.41 \\
+    integrator of the action record & 0.0 & 1.00 & -- & -- & 0.0 & 1.00 \\
+    \bottomrule
+\end{tabular}

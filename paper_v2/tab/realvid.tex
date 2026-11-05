@@ -1,0 +1,16 @@
+\begin{tabular}{lcccccc}
+    \toprule
+    wiring & zero-shot MSE & fine-tuned MSE & heading, sim.\ readout & heading, clip readout & NYC model, zero-shot & NYC model, fine-tuned \\
+    \midrule
+    GRU, parameter-matched & 9.94\pm0.07 & \textbf{1.18\pm0.00} & 84.1\pm34.2 & 7.6\pm0.7 & \textbf{5.57\pm0.03} & -- \\
+    dense & 9.73\pm0.07 & 1.21\pm0.04 & 29.5\pm6.4 & 9.1\pm0.9 & -- & -- \\
+    connectome, unsigned & 9.59\pm0.13 & 1.26\pm0.00 & \textbf{24.3\pm6.3} & 7.7\pm0.3 & -- & -- \\
+    \textbf{connectome} & 9.68\pm0.10 & 1.24\pm0.02 & 30.9\pm22.8 & 7.7\pm0.5 & 6.10\pm0.03 & -- \\
+    random & \textbf{9.56\pm0.19} & 1.26\pm0.01 & 79.1\pm14.5 & 9.9\pm1.1 & 6.00\pm0.02 & -- \\
+    degree-shuffled & 9.69\pm0.09 & 1.25\pm0.02 & 88.7\pm27.0 & \textbf{7.1\pm0.6} & 6.01\pm0.05 & -- \\
+    \midrule
+    copy last visible latent & 0.84 & 0.84 & -- & -- & 0.84 & 0.84 \\
+    constant mean & 10.28 & 10.28 & -- & -- & 10.28 & 10.28 \\
+    actions only (linear floor) & -- & -- & -- & 4.7 & -- & -- \\
+    \bottomrule
+\end{tabular}

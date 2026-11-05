@@ -1,0 +1,39 @@
+\usepackage{caption}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{microtype}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,calc,fit,backgrounds,decorations.pathmorphing}
+\usepackage{xcolor}
+\usepackage{array}
+
+\newcommand{\todo}[1]{{\color{red}#1}}
+\newcommand{\TODO}[1]{\textbf{\color{red}[TODO: #1]}}
+\newcommand{\method}{CxWM\xspace}
+\newcommand{\vjepa}{V-JEPA~2.1\xspace}
+\newcommand{\flywire}{FlyWire\xspace}
+\providecommand{\etal}{\emph{et al}.\xspace}
+\providecommand{\ie}{\emph{i.e}.\xspace}
+\providecommand{\eg}{\emph{e.g}.\xspace}
+\newcommand{\degree}{$^\circ$}
+\let\mathpm\pm
+\renewcommand{\pm}{\ensuremath{\mathpm}}
+\setlength{\abovecaptionskip}{.5em}
+\renewcommand{\paragraph}[1]{\vspace{.4em}\noindent\textbf{#1.}}
+
+% diagram colours (populations match the released 3-D viewer)
+\definecolor{cVIS}{RGB}{66,133,244}
+\definecolor{cCX}{RGB}{244,160,0}
+\definecolor{cMB}{RGB}{52,168,83}
+\definecolor{cOUT}{RGB}{219,68,155}
+\definecolor{cTeach}{RGB}{90,90,90}
+\tikzset{
+  box/.style={draw,rounded corners=2pt,minimum height=1.6em,inner sep=4pt,font=\small,align=center},
+  pop/.style={box,fill=#1!15,draw=#1!80!black,thick},
+  arr/.style={-{Latex[length=2mm]},thick},
+  darr/.style={-{Latex[length=2mm]},thick,dashed},
+  lbl/.style={font=\scriptsize,align=center},
+}
