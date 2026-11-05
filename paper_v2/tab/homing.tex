@@ -1,0 +1,20 @@
+\begin{tabular}{lcccccc}
+    \toprule
+    & \multicolumn{2}{c}{Arena} & \multicolumn{2}{c}{Continuous turns} & \multicolumn{2}{c}{NYC twin} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+    pose readout & \% closer & success & \% closer & success & \% closer & success \\
+    \midrule
+    oracle pose (controller ceiling) & 89 & 1.00 & -- & -- & 75 & 0.92 \\
+    dead reckoning of actions & 89 & 1.00 & 87 & 0.90 & 76 & 0.92 \\
+    random actions (floor) & -67 & 0.00 & -- & -- & -- & -- \\
+    \midrule
+    GRU, parameter-matched state & 13 & 0.04 & 21 & 0.16 & 19 & 0.12 \\
+    GRU, recurrent-budget-matched state & 29 & 0.15 & -- & -- & -- & -- \\
+    dense state & 36 & 0.11 & -- & -- & -- & -- \\
+    connectome, unsigned state & \textbf{47} & 0.13 & -- & -- & -- & -- \\
+    \textbf{connectome} state & 42 & 0.10 & \textbf{33} & \textbf{0.16} & 47 & 0.37 \\
+    random state & 34 & 0.09 & -- & -- & -- & -- \\
+    block-shuffled state & 44 & \textbf{0.15} & -- & -- & \textbf{53} & \textbf{0.47} \\
+    degree-shuffled state & 42 & 0.14 & -- & -- & -- & -- \\
+    \bottomrule
+\end{tabular}

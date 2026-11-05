@@ -273,6 +273,81 @@ trivial predictors for the same episodes, so `summarize.py` shows E7 as its own 
 (`--from_npz ... --device cuda`), and `scripts/aws_h100.sh` stage `realvid` runs every K=1 checkpoint through it.
 `scripts/vast_launch.sh` rents one RTX 4090 on Vast.ai and drives the GPU script end to end.
 
+## Spotlight roadmap (2026-11-05): what the evidence says and what is still missing
+
+Run 2 arena numbers (3 seeds, blind latent MSE at horizon 1 / 8, lower is better): connectome 0.419 / 0.709,
+block-shuffled 0.426 / 0.711, random (ER) 0.459 / 0.690, transformer 0.402 / 0.611, GRU 0.348 / 0.525. Attention
+input and the hybrid layer do not move the connectome. Read plainly: **on prediction, synapse-level identity buys
+nothing measurable** (1.5 % over block-shuffled at h1, tied at h8, behind random wiring at h8), and every
+parameter-matched free architecture is well ahead. The paper's positive claim lives entirely in the state probes
+(heading / position decodable during blind windows), blind homing, and the real-video transfer. Those numbers are the
+23 `\TODO` macros in `paper_v2/num_pending.tex` and come from stages `hd homing` + `run_l4_realvid.sh` of run 2.
+
+Status today: a careful analysis paper with a clean negative on prediction and a mechanistic positive on the state.
+That is main-track material, not a spotlight. The items below are ordered by leverage; 1-3 are this submission,
+4-9 are the next cycle.
+
+| # | item | why it matters | cost | status |
+|---|---|---|---|---|
+| 1 | Finish run 2 (`tn nyc hd homing summary`, then realvid) and regenerate `num.tex` | the only positive claim has no numbers yet | tonight, L4 | running |
+| 2 | Reframe abstract / intro around the negative prediction result + the state finding; state the h8 tie with random wiring | reviewers will rebuild the MSE table | 1 day | open (#14) |
+| 3 | Unidirectional LSTM at the same budget, 3 seeds | pre-empts "why only GRU"; expected within noise of GRU | 15 min, L4 | open (#15) |
+| 4 | A task the connectome **wins**, not just encodes: blind homing on continuous turns, longer blackouts (8:24, 4:24), heading under action noise | a spotlight needs an outright win against the matched GRU | 1-2 days | partly in run 2 (#16) |
+| 5 | Closed-loop navigation on real scenes: 3D Gaussian splat twins of the phone clips (COLMAP + Splatfacto/gsplat), env wrapper, planner with blackout stretches, SPL / success / collision; fix the goal-latent cost first (0 % even with oracle dynamics) | the computer-vision result a CVPR audience expects; the one place dead-reckoning state can beat raw prediction | 1-2 weeks | open (#17, #9) |
+| 6 | A distillation objective that uses the structure: auxiliary dead-reckoning loss on CX only, or a contrastive across-blackout term; report as a design, not a by-product | turns "heading is decodable" into "the circuit was trained as a path integrator" | 1 day each | open (#18) |
+| 7 | Scale the claim beyond one graph: ablation stage on the new controls (min_syn 1 / region sets), K=1-3 with CIs, a second connectome (larval CNS or hemibrain) | "one graph, one species" is the first attack | 2-3 GPU days | open (#19) |
+| 8 | Larger teacher (ViT-L, 384 px) and a second real-odometry dataset (RECON / SCAND) for the real-video stage | removes the single-teacher and flow-estimated-action caveats | 1-2 GPU days + data | open (#20) |
+| 9 | Graph neural network student on the real edges (vector node state, typed message MLP, same budget), run on all three wirings | gives the real graph capacity without changing who talks to whom; separates capacity from wiring | 1 week, L4 | open (#21, Atharva) |
+
+### Owners (2026-11-05)
+
+| work | owner | issue | where to start |
+|---|---|---|---|
+| Run 2 on the L4 (tn, nyc, probes, homing, real video) and `num.tex` | Prajak | #1-#13 | `scripts/run_l4.sh`, `scripts/make_paper_tables.py` |
+| Closed-loop navigation on the NYC digital twin (planner goal cost, blackout-in-the-loop) | Prajak | #9 | `scripts/eval_plan.py`, `scripts/eval_goalnav.py` |
+| A task the connectome wins outright | Atharva | #16 | `scripts/eval_homing.py`, `scripts/eval_hd.py`, run 2 `_tn` / `_b8_24` outputs |
+| Graph neural network student (message passing on the connectome) | Atharva | #21 | `wm2cx/student.py` (`FlyBrain`), `wm2cx/transformer.py` as the template for a new `--wiring` |
+| Closed-loop navigation on real crowded-scene video (splat twins of the phone clips) | Priyanshi | #17 | `scripts/ingest_video.py`, `data/realvid_all.npz`, `wm2cx/env.py` interface |
+| LSTM baseline at the same budget | Priyanshi | #15 | `scripts/train.py --wiring gru` path, `wm2cx/student.py::gru_hidden_for` |
+| Reframe abstract / intro around the negative result | Amitava sir | #14 | `paper_v2/sec/0_abstract.tex`, `sec/1_intro.tex`, scorecard in `sec/4_experiments.tex` |
+
+### Graph neural network student (for Atharva; issue #21)
+
+**What the student is now.** One sparse recurrent layer: `h_{t+1} = (1-a) h_t + a tanh(g (W h_t + W_in o_t + W_act a_t + b))`
+with `W` an edge list of 91,663 signed scalars (`W_ij = s_ij softplus(w_ij)`, sign fixed). In GNN terms that is already
+one round of message passing per time step with a *scalar* message (`w_ij * h_j`), sum aggregation and a tanh node
+update. Everything a GNN adds is on top of that: vector node states, learned message functions, type-aware edges.
+
+**What to build: `--wiring gnn` in `scripts/train.py`, class `FlyGNN` in `wm2cx/student.py`.**
+1. Node state `h_i in R^d` with `d` in {4, 8, 16} per neuron instead of a scalar (6,935 x d).
+2. Message on each real edge `m_ij = s_ij * softplus(w_ij) * phi(h_j)` where `phi` is a small MLP shared across edges
+   of the same (pre cell type, post cell type) pair; keep the sign fixed so Dale's law survives. Sum-aggregate with
+   `index_add` exactly as the edge-list code does now (`FlyBrain.step`), so cost stays O(E d).
+3. Node update: GRU cell or `tanh` MLP per cell type (`h_i' = GRUCell(m_i + W_in o_t[i] + W_act a_t[i], h_i)`),
+   shared parameters per type so the count stays small.
+4. Readout: same linear map from the concatenated state (6,935 d -> 256); for d > 1 pool with a per-type linear first
+   so the readout does not become the whole budget.
+5. Parameter accounting must match the other cores (3.71 M total) via `param_breakdown`; shrink `d` or share more until it does.
+
+**Controls that make it a result, not a demo.** Run the same GNN on `connectome`, `block_shuffled`, `random`: if the GNN
+beats the GRU only on the real graph the wiring matters; if it beats the GRU on all three, the gain is the message
+function, not the connectome. Both outcomes are publishable, but they are different papers. Also report `d = 1` with
+the learned `phi` (is it the vector state or the message MLP that helps?).
+
+**Why it could be the outright win (#16).** The scalar student loses to the GRU because its only free parameters on the
+graph are 91,663 magnitudes; the GRU has 0.7 M recurrent weights. A GNN gives the real graph vector capacity while
+keeping which neurons talk to which. If sum-aggregated typed messages on the CX ring recover heading *and* prediction,
+the paper has its win. If they do not, the finding "capacity on the real graph still loses" is the cleaner negative.
+
+**Order of work (about one week on the L4).** (i) `FlyGNN` with `d=1`, learned `phi`, check it reproduces the scalar
+numbers when `phi` is identity; (ii) `d=8`, 3 seeds, arena; (iii) the three wirings; (iv) probes and homing through the
+existing `eval_hd.py` / `eval_homing.py` (they take a checkpoint and a state, so nothing changes); (v) `tn` data.
+Tests go in `tests/test_student.py` next to the existing ones. Message-passing references to cite: Gilmer 2017 (MPNN),
+Battaglia 2018 (graph networks), Sanchez-Gonzalez 2020 (learned simulators); for biology-constrained GNNs,
+Lappalainen 2024 (connectome-constrained fly visual model).
+
+Non-goals until 5 works: appearance shifts, latency tables, humanoid transfer. Issue register: `PAPER_ISSUES.md` section F.
+
 ## Web pages
 - `docs/explainer.html`: plain-language five-scene explainer with results.
 - `docs/world_brain_split.html`: world view and 3D brain side by side on one shared step slider, Times Square episode at 768 px. Built by `scripts/build_split_page.py`.

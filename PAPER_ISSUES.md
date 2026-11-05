@@ -8,6 +8,8 @@ Numbers below were recomputed from `data/connectome.npz`, `results/runs/*.json` 
 
 **Status 2026-10-31:** code fixes for B1-B9, B11-B14 and the A-row efficiency / K=3 items are in (see README "Issue fixes" and GitHub issues #1-#13); the rerun is `scripts/run_v2.sh`. Planner diagnosis: the CEM search is fine with oracle dynamics + oracle cost (90 % success); the student goal-latent cost is what fails (0 % even with oracle dynamics).
 
+**Status 2026-11-05:** run 2 (L4, `scripts/run_l4.sh`) arena stage done with the fixed controls: connectome 0.419 / 0.709 vs block-shuffled 0.426 / 0.711 vs random 0.459 / 0.690 vs transformer 0.402 / 0.611 vs GRU 0.348 / 0.525 (h1 / h8 blind MSE, 3 seeds). B1 is therefore answered in the negative for prediction: the claim must be region-level architecture + state structure, not synapse identity. Probes, homing and real video pending (stages `hd homing`, `run_l4_realvid.sh`). New issues #14-#20 in section F.
+
 ---
 
 ## A. Claim vs. evidence (P0)
@@ -128,6 +130,19 @@ confounds in B fixed and a much stronger head-direction story.
    inputs; per-architecture lr sweep (B5, B6).
 5. Planner validated with teacher-as-dynamics oracle, then student MPC on NYC with SPL/collision metrics (A).
 6. Only if 5 works: geographic split, blackout-in-the-loop, appearance shifts, latency table.
+
+## F. Spotlight gap (added 2026-11-05, after run 2 arena results)
+
+| # | sev | owner | issue | fix | file |
+|---|---|---|---|---|---|
+| 14 | P0 | Amitava sir | Abstract/intro frame the 1.5 % edge over block-shuffled as the result; h8 tie with random wiring unstated | lead with the negative prediction result, then the state-structure finding; add the h8 row | `.github/issues/14-reframe-negative-result.md` |
+| 15 | P2 | Priyanshi | Only a GRU as the gated baseline | unidirectional LSTM, same 3.71 M budget, 3 seeds; BiLSTM is non-causal and must not be used | `15-lstm-baseline.md` |
+| 16 | P0 | Atharva | No task where the connectome beats the matched GRU outright | blind homing on continuous turns, blackout 8:24 / 4:24, action-noise heading; report success not just R² | `16-outright-win-task.md` |
+| 17 | P0 | Priyanshi | No closed-loop result on real scenes | splat twins of the phone clips + env wrapper + planner with blackout; SPL / success / collision; depends on #9 goal-cost fix | `17-splat-twins-closed-loop.md` |
+| 18 | P1 | Prajak | Heading in the state is a by-product the loss never asks for | auxiliary CX dead-reckoning loss or across-blackout contrastive term; ablate | `18-structure-aware-objective.md` |
+| 19 | P1 | Atharva | One graph, one species | ablation stage on new controls, K=1-3 with CIs, second connectome | `19-scale-beyond-one-graph.md` |
+| 20 | P2 | Priyanshi | Single ViT-B teacher; real-video actions are flow-estimated | ViT-L 384 px; RECON / SCAND with real odometry | `20-teacher-and-odometry.md` |
+| 21 | P1 | Atharva | Scalar edge weights give the real graph no vector capacity; the GRU wins on capacity, not wiring | `--wiring gnn`: typed message MLP on the real edges, d-dim node state, GRU-cell update, same 3.71 M budget, run on all three wirings (README "Graph neural network student") | `21-gnn-student.md` |
 
 ---
 
