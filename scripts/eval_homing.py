@@ -135,7 +135,7 @@ if a.readout in ("state", "mlp"):
     del X, Hs
 
 
-t0 = time.time(); succ, dfinal, eff, dstart_blind = [], [], [], []; ep = -1; done = 0
+t0 = time.time(); succ, dfinal, eff, dstart_blind, drift = [], [], [], [], []; ep = -1; done = 0
 while done < a.episodes:
     ep += 1; env, img, pol = make_env(ep); pos0, hd0 = env.pos.copy(), float(env.heading)
     # outbound phase must take the agent at least 2 success radii from home, otherwise the episode is trivial: peek with a copy of the env RNG
@@ -162,6 +162,8 @@ while done < a.episodes:
             else: rp = None
             ac = int(rng.integers(1, 4)) if rp is None else controller(rp, n_turn)[0]
             n_turn = n_turn + 1 if ac in (2, 3) else 0
+            if t == a.t_vis + a.t_blind - 1 and rp is not None:                      # position drift of the decoded pose at the end of the blackout
+                tp = rel_pose(env.pos, env.heading, pos0, hd0); drift.append(float(np.hypot(rp[2] - tp[2], rp[3] - tp[3])))
             if a.verbose and done < a.verbose:
                 print(f"  ep {ep} t {t} decoded {np.round(rp, 2) if rp is not None else '-'} true {np.round(rel_pose(env.pos, env.heading, pos0, hd0), 2)} -> action {ac}", flush=True)
         before = env.pos.copy()
@@ -179,6 +181,6 @@ while done < a.episodes:
     if done % 10 == 1: print(f"ep {ep}: blind-start dist {d0:.2f} -> final {dfin:.2f}  success so far {np.mean(succ):.2f}  {time.time()-t0:.0f}s", flush=True)
 res = dict(run=a.run, env=a.env, readout=a.readout, t_vis=a.t_vis, t_blind=a.t_blind, radius=R_SUCC, turn_noise=a.turn_noise, episodes=a.episodes, tol_deg=a.tol_deg, max_turns=a.max_turns, backward=a.backward, fit_rollouts=a.fit_rollouts,
            success=float(np.mean(succ)), dist_blind_start=float(np.mean(dstart_blind)), dist_final=float(np.mean(dfinal)), path_efficiency=float(np.mean(eff)),
-           per_episode_final=[round(x, 3) for x in dfinal])
+           drift_end=(float(np.mean(drift)) if drift else None), per_episode_final=[round(x, 3) for x in dfinal], per_episode_drift=[round(x, 3) for x in drift])
 print(json.dumps({k: v for k, v in res.items() if k != "per_episode_final"}))
 os.makedirs("results/homing", exist_ok=True); json.dump(res, open(f"results/homing/{a.run}_{a.env}_{a.readout}{a.tag}.json", "w"), indent=1)
