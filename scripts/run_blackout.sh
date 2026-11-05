@@ -11,13 +11,14 @@ set -u; cd "$(dirname "$0")/.."; export PYTHONPATH=. OMP_NUM_THREADS=4
 PY=${PY:-python}; DEVICE=${DEVICE:-cuda}; SEEDS=${SEEDS:-"0 1 2"}; ENVS=${ENVS:-"arena nyc"}; P=${P:-2}
 KS=${KS:-"8 16 24 30 40"}                                   # pre-registered blackout lengths; never change after seeing results
 WIRINGS=${WIRINGS:-"connectome block_shuffled random dense gru transformer"}
-READOUTS=${READOUTS:-"state"}; EPISODES=${EPISODES:-100}; FIT=${FIT:-300}
+READOUTS=${READOUTS:-"state mlp"}; EPISODES=${EPISODES:-100}; FIT=${FIT:-300}
+RADIUS_ARENA=${RADIUS_ARENA:-2.0}                           # arena success radius = 2 units (3.3 steps of 0.6), same radius/step ratio as NYC (12 m / 3 m); fixed 2026-11-05 before the L4 sweep
 TASKS=${TASKS:-"t1 t2 t3"}
 TN=${TN:-0.3}; TN_CKPT=${TN_CKPT:-1}                   # continuous turns on the arena; TN_CKPT=1 uses the _tn checkpoints, 0 tests clean-trained ones with turn noise
 mkdir -p logs results/homing; LOG=logs/blackout_$(date +%F).log
 jobs=()
 for env in $ENVS; do
-  tn_args=""; sfx=""; ck=""; if [ "$env" = arena ] && [ "$TN" != 0 ]; then tn_args="--turn_noise $TN"; sfx=_tn; [ "$TN_CKPT" = 1 ] && ck=_tn; fi
+  tn_args=""; sfx=""; ck=""; if [ "$env" = arena ]; then tn_args="--radius $RADIUS_ARENA"; fi; if [ "$env" = arena ] && [ "$TN" != 0 ]; then tn_args="$tn_args --turn_noise $TN"; sfx=_tn; [ "$TN_CKPT" = 1 ] && ck=_tn; fi
   nyc=""; [ "$env" = nyc ] && nyc=_nyc
   for k in $KS; do
     case " $TASKS " in *" t2 "*)
