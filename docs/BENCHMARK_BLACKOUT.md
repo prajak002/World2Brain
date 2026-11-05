@@ -112,3 +112,24 @@ al. 2022 (`panvaf/LearnPI`, one ring circuit learns heading integration by predi
 (`aplbrain/seismic`, hemibrain PEN synapses as a heading estimator), Lappalainen et al. 2024 (connectome-constrained
 visual system). None scores a latent world model by closed-loop behaviour under blackout; none uses the whole central
 complex subgraph; none has shuffled-wiring controls on behaviour.
+
+## 10. Pilot, 2026-11-05 evening (Mac M1, old 2026-11-02 checkpoints, clean-trained, tested with turn noise 0.3, 50 episodes)
+
+Arena, T1 Return, success [bootstrap 95% CI]; files in `results/pilot_blackout_mac/` (kept out of `results/homing/` so
+the run-2 sweep on the L4 does not skip them as "done").
+
+| row | k=8 | k=16 | k=24 | k=30 | k=40 |
+|---|---|---|---|---|---|
+| oracle pose (ceiling) | 0.32 | 0.84 | 1.00 | 1.00 | 1.00 |
+| dead reckoning of actions | 0.28 | 0.74 | 0.90 | 0.92 | 0.92 |
+| random actions (floor) | 0.00 | 0.00 | 0.00 | 0.02 | 0.00 |
+| connectome (2 seeds) | 0.33 [0.24, 0.42] | 0.19 [0.11, 0.27] | 0.13 [0.07, 0.20] | 0.12 [0.06, 0.19] | 0.09 [0.04, 0.15] |
+| dense (1 seed) | 0.20 | 0.20 | 0.18 | 0.22 | 0.18 |
+| GRU, param.-matched (1 seed) | 0.10 | 0.08 | 0.10 | 0.06 | 0.10 |
+
+What it says. (i) k = 8 is time-limited (oracle 0.32); the memory region is k >= 16. (ii) On the **arena** no student
+wins: the connectome sits at 0.1-0.2 with dense, all far below dead reckoning, and the connectome does not separate
+from dense. The arena is a 1-unit radius with 0.6-unit steps, so any decoded-pose error of a step or two is a miss.
+(iii) The win we have is on the **NYC twin** (connectome 0.47 vs GRU 0.12 at k = 30, 12 m radius, 3 m steps). The hero
+figure therefore has to be the NYC panel, and the arena panel will show a null unless the run-2 `_tn` checkpoints and
+an MLP readout change it. Decision for the L4 sweep: run NYC first (all rows, all k, 3 seeds), arena second.
