@@ -169,7 +169,9 @@ if gn:
     byg = {}
     for n, d in gn.items():
         m = re.match(r"^(.*)_K1_s(\d+)(_nyc)?$", d["run"]); w = (m.group(1) if m else d["run"])
-        byg.setdefault((w, d["env"], d["readout"]), {}).setdefault(d["blackout"], []).append((d["success"], d["spl"]))
+        env = d["env"] + ("" if d.get("appearance", "clear") == "clear" else f" ({d['appearance']})")
+        ro = d["readout"] + ("" if d.get("controller", "greedy") == "greedy" else f" + {d['controller']}")
+        byg.setdefault((w, env, ro), {}).setdefault(d["blackout"], []).append((d["success"], d["spl"]))
     for (w, env, ro), bb in sorted(byg.items()):
         cell = lambda k: (f"{np.mean([x[0] for x in bb[k]]):.2f} / {np.mean([x[1] for x in bb[k]]):.2f}" if k in bb else "-")
         L.append(f"| {w} | {env} | {ro} | {max(len(v) for v in bb.values())} | {cell(0)} | {cell(3)} | {cell(5)} |")
