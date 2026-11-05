@@ -30,6 +30,12 @@ p.add_argument("--readout", default="state", choices=["state", "mlp", "oracle", 
 p.add_argument("--blackout", type=int, default=0); p.add_argument("--blackout_at", type=int, default=6)
 p.add_argument("--lam", type=float, default=100.0); p.add_argument("--fit_rollouts", type=int, default=200)
 p.add_argument("--tol_deg", type=float, default=45.0); p.add_argument("--max_turns", type=int, default=8)
+p.add_argument("--controller", default="greedy", choices=["greedy", "bumper"],
+               help="greedy: turn toward the decoded goal vector, else forward. bumper: same, but a blocked forward step (the env's collision "
+                    "counter, a proprioceptive signal that stays available in the blackout) triggers a fixed turn away and a short forward commitment, "
+                    "so the agent slides along building fronts instead of pushing into them (#9/#10)")
+p.add_argument("--avoid_turns", type=int, default=2, help="bumper: turns (pi/8 each) after a collision"); p.add_argument("--commit", type=int, default=3, help="bumper: forward steps before re-aiming")
+p.add_argument("--appearance", default="clear", help="nyc: clear|overcast|fog|dusk|night (#10)")
 p.add_argument("--tag", default=""); a = p.parse_args()
 dev = a.device; rng = np.random.default_rng(a.seed); torch.manual_seed(a.seed)
 eh, ew = 8, 32; TURN = np.pi / 8; TOL = np.deg2rad(a.tol_deg); T = a.steps or (24 if a.env == "arena" else 40)
@@ -50,7 +56,7 @@ def ego_goal(pos, hd, goal):
 def make_env(ep):
     if a.env == "nyc":
         from wm2cx.nyc import NYCArena
-        env = NYCArena(res=256, seed=a.seed * 1000 + ep); img = env.reset(); pol = lambda: env.policy(rng, 0.0)
+        env = NYCArena(res=256, seed=a.seed * 1000 + ep, appearance=a.appearance); img = env.reset(); pol = lambda: env.policy(rng, 0.0)
     else:
         env = FlyArena(task="nav", res=256, seed=a.seed * 1000 + ep); img = env.reset(); pol = lambda: scripted_policy(env, rng, 0.0)
     return env, img, pol
@@ -64,6 +70,22 @@ def controller(g, n_turn):
     gx, gy = float(g[0]), float(g[1]); err = np.arctan2(gy, gx)
     if abs(err) > TOL and n_turn < a.max_turns: return 2 if err > 0 else 3
     return 1
+
+
+class Bumper:
+    """Greedy controller plus collision recovery: after a blocked forward step, turn `avoid_turns` times away from the goal side
+    that was blocked (alternating sides on repeated hits) and then commit `commit` forward steps before aiming again."""
+    def __init__(self): self.turns_left = 0; self.commit_left = 0; self.side = 1; self.last_coll = 0; self.last_act = 0
+    def __call__(self, env, g, n_turn):
+        coll = getattr(env, "collisions", 0)
+        if self.last_act == 1 and coll > self.last_coll:                       # forward step was blocked
+            self.side = -self.side if self.turns_left or self.commit_left else (1 if float(g[1]) >= 0 else -1)
+            self.turns_left, self.commit_left = a.avoid_turns, a.commit
+        self.last_coll = coll
+        if self.turns_left: self.turns_left -= 1; ac = 2 if self.side > 0 else 3
+        elif self.commit_left: self.commit_left -= 1; ac = 1
+        else: ac = controller(g, n_turn)
+        self.last_act = ac; return ac
 
 
 # ---------------- readout fit: training episodes (+ closed-loop rollouts) ----------------
@@ -118,14 +140,15 @@ for ep in range(a.episodes):
     env, img, pol = make_env(ep); g = goal_of(env); d0 = env.goal_distance()
     shortest = max((env.shortest_path_length() - R_SUCC) if a.env == "nyc" else (d0 - R_SUCC), 1e-6); travelled = 0.0; prev_pos = env.pos.copy()
     h = model.init_state(1, dev) if model is not None else None; prev = torch.zeros(1, dtype=torch.long, device=dev); n_turn = 0; s = 0.0
+    bump = Bumper(); ctrl = (lambda g: bump(env, g, n_turn)) if a.controller == "bumper" else (lambda g: controller(g, n_turn))
     for t in range(T):
         visible = visible_at(t)
         if model is not None:
             o = eye(img) if visible else torch.zeros(eh * ew * 3, device=dev)
             with torch.no_grad(): h = model.step(h, o[None], prev, torch.full((1,), float(visible), device=dev), W)
         if a.readout in ("state", "mlp"):
-            with torch.no_grad(): ac = controller(readout(h)[0].cpu().numpy(), n_turn)
-        elif a.readout == "oracle": ac = controller(ego_goal(env.pos, env.heading, g), n_turn)
+            with torch.no_grad(): ac = ctrl(readout(h)[0].cpu().numpy())
+        elif a.readout == "oracle": ac = ctrl(ego_goal(env.pos, env.heading, g))
         else: ac = int(rng.integers(1, 4))
         n_turn = n_turn + 1 if ac in (2, 3) else 0
         img_, s = env.step(ac); img = img_ if img_ is not None else img; prev = torch.tensor([ac], device=dev)
@@ -133,9 +156,10 @@ for ep in range(a.episodes):
         if s: break
     succ.append(float(s)); spl.append(float(s) * shortest / max(shortest, travelled, 1e-6)); dfin.append(env.goal_distance()); d0s.append(d0)
     if ep % 10 == 0: print(f"ep {ep}: goal dist {d0:.2f} -> {dfin[-1]:.2f}  success so far {np.mean(succ):.2f}  SPL {np.mean(spl):.2f}  {time.time()-t0:.0f}s", flush=True)
-res = dict(run=a.run, env=a.env, readout=a.readout, blackout=a.blackout, blackout_at=a.blackout_at, steps=T, episodes=a.episodes, tol_deg=a.tol_deg,
+res = dict(run=a.run, env=a.env, readout=a.readout, controller=a.controller, appearance=a.appearance, blackout=a.blackout, blackout_at=a.blackout_at, steps=T, episodes=a.episodes, tol_deg=a.tol_deg,
            max_turns=a.max_turns, fit_rollouts=a.fit_rollouts, success=float(np.mean(succ)), spl=float(np.mean(spl)),
            dist_start=float(np.mean(d0s)), dist_final=float(np.mean(dfin)))
 print(json.dumps(res))
 os.makedirs("results/goalnav", exist_ok=True)
-json.dump(res, open(f"results/goalnav/{a.run}_{a.env}_{a.readout}_b{a.blackout}{a.tag}.json", "w"), indent=1)
+sfx = ("" if a.controller == "greedy" else f"_{a.controller}") + ("" if a.appearance == "clear" else f"_{a.appearance}")
+json.dump(res, open(f"results/goalnav/{a.run}_{a.env}_{a.readout}_b{a.blackout}{sfx}{a.tag}.json", "w"), indent=1)
