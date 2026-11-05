@@ -16,6 +16,8 @@ about the test episodes (their own seeds) is seen. Baselines with the same contr
    --readout oracle   true pose (controller ceiling)            --readout actions  dead reckoning from the discrete action record
    --readout random   random actions (floor)                   --readout mlp      2-layer MLP readout of the same state (is the information
                                                                                   present but non-linear?)
+   --readout policy   behaviour-cloned policy head h_t -> action (no pose decode, no hand-written controller); trained on the oracle
+                      controller's actions along --fit_rollouts dark rollouts. Whatever state carries more information wins.
 Success = true distance to start < `--radius` at the end of the blind phase (or when the agent stops). Metrics: success, final
 distance, path efficiency (straight-line / path length during the blind phase). Arena and NYC raycast twin (--env nyc).
 
@@ -32,7 +34,8 @@ p = argparse.ArgumentParser()
 p.add_argument("--run", default="connectome_K1_s0"); p.add_argument("--device", default="cuda")
 p.add_argument("--env", default="arena", choices=["arena", "nyc"]); p.add_argument("--episodes", type=int, default=50); p.add_argument("--seed", type=int, default=11)
 p.add_argument("--t_vis", type=int, default=12); p.add_argument("--t_blind", type=int, default=24)
-p.add_argument("--readout", default="state", choices=["state", "mlp", "oracle", "actions", "random"])
+p.add_argument("--readout", default="state", choices=["state", "mlp", "policy", "oracle", "actions", "random"],
+               help="policy: a 2-layer policy head state -> action, behaviour-cloned on --fit_rollouts oracle-driven rollouts (lever 1, docs/BENCHMARK_BLACKOUT.md); the same head for every wiring")
 p.add_argument("--lam", type=float, default=100.0); p.add_argument("--radius", type=float, default=0.0, help="success radius (0 = 1.0 arena units / 12 m twin)")
 p.add_argument("--stop_frac", type=float, default=0.6, help="stop when the decoded distance is below stop_frac * radius")
 p.add_argument("--turn_noise", type=float, default=0.0, help="arena: relative sd of the turn angle (makes dead reckoning imperfect)")
@@ -81,23 +84,42 @@ def fit_rollouts(n):
     """States and true relative poses along n closed-loop episodes in fresh arenas (seeds disjoint from the test episodes):
     scripted outbound for t_vis steps, then the oracle controller in the dark with 20% random actions. Gives the readout the
     action statistics of homing (turn bursts), which the scripted training episodes lack."""
-    Xs, Ys = [], []; r = np.random.default_rng(a.seed + 1)
+    Xs, Ys, As = [], [], []; r = np.random.default_rng(a.seed + 1)
     for i in range(n):
+        if n >= 200 and i % 200 == 0: print(f"  rollouts {i}/{n}", flush=True)
         env, img, pol = make_env(100_000 + i); pos0, hd0 = env.pos.copy(), float(env.heading)
         h = model.init_state(1, dev); prev = torch.zeros(1, dtype=torch.long, device=dev); n_turn = 0
         for t in range(a.t_vis + a.t_blind):
             visible = t < a.t_vis; o = eye(img) if visible else torch.zeros(eh * ew * 3, device=dev)
             with torch.no_grad(): h = model.step(h, o[None], prev, torch.full((1,), float(visible), device=dev), W)
             true = rel_pose(env.pos, env.heading, pos0, hd0); Xs.append(h[0]); Ys.append(true)
-            if visible: ac = pol()
-            else: ac = int(r.integers(0, 4)) if r.random() < 0.2 else controller(true, n_turn)[0]; n_turn = n_turn + 1 if ac in (2, 3) else 0
+            if visible: ac = pol(); As.append(-1)
+            else:
+                star = controller(true, n_turn)[0]; As.append(star)                            # expert label (DAgger-style: the state is the agent's own)
+                ac = int(r.integers(0, 5)) if r.random() < 0.2 else star; n_turn = n_turn + 1 if ac in (2, 3) else 0
             step_out = env.step(ac) if a.env == "arena" else env.step(ac, render=t + 1 < a.t_vis)
             img = step_out[0] if step_out[0] is not None else img; prev = torch.tensor([ac], device=dev)
+    fit_rollouts.labels = torch.tensor(As, device=dev)
     return torch.stack(Xs).float(), torch.from_numpy(np.stack(Ys)).to(dev)
 
 
 # ---------------- readout fit on the training episodes ----------------
 model = readout = None
+if a.readout == "policy":                                        # lever 1: behaviour-cloned policy head on the agent's own dark states
+    model, args, conn, lat = load_run(a.run, device=dev); W = model.edge_weights()
+    Xr, _ = fit_rollouts(a.fit_rollouts); lab = fit_rollouts.labels; keep = lab >= 0; Xr, lab = Xr[keep], lab[keep]
+    mu_x, sd_x = Xr.mean(0), Xr.std(0) + 1e-6
+    net = torch.nn.Sequential(torch.nn.Linear(model.N, 256), torch.nn.Tanh(), torch.nn.Linear(256, 5)).to(dev)
+    opt = torch.optim.Adam(net.parameters(), 1e-3, weight_decay=1e-5); n = len(Xr); n_val = max(1, n // 10)
+    perm = torch.randperm(n, device=dev); va, trn = perm[:n_val], perm[n_val:]
+    for ep in range(40):
+        pp = trn[torch.randperm(len(trn), device=dev)]
+        for i in range(0, len(pp), 1024):
+            j = pp[i:i + 1024]; loss = torch.nn.functional.cross_entropy(net((Xr[j] - mu_x) / sd_x), lab[j]); opt.zero_grad(); loss.backward(); opt.step()
+    net.eval()
+    with torch.no_grad(): acc = float((net((Xr[va] - mu_x) / sd_x).argmax(-1) == lab[va]).float().mean())
+    print(f"policy head: {n} dark states from {a.fit_rollouts} rollouts, held-out action accuracy {acc:.3f}", flush=True)
+    policy = lambda h: int(net((h - mu_x) / sd_x).argmax(-1)); del Xr
 if a.readout in ("state", "mlp"):
     model, args, conn, lat = load_run(a.run, device=dev); W = model.edge_weights()
     tr, _ = load_split(args["train"], lat, with_z=False); E, T = tr["obs"].shape[:2]      # teacher latents are not needed here (and slow to load)
@@ -155,12 +177,14 @@ while done < a.episodes:
             ac = pol()
         else:
             if t == a.t_vis: d0 = float(np.linalg.norm(env.pos - pos0)); path = 0.0; n_turn = 0
-            if a.readout in ("state", "mlp"):
+            if a.readout == "policy":
+                with torch.no_grad(): rp = None; ac_pol = policy(h)
+            elif a.readout in ("state", "mlp"):
                 with torch.no_grad(): rp = readout(h)[0].cpu().numpy()
             elif a.readout == "oracle": rp = rel_pose(env.pos, env.heading, pos0, hd0)
             elif a.readout == "actions": rp = np.array([np.cos(dr_th), np.sin(dr_th), dr_pos[0], dr_pos[1]], np.float32)
             else: rp = None
-            ac = int(rng.integers(1, 4)) if rp is None else controller(rp, n_turn)[0]
+            ac = ac_pol if a.readout == "policy" else int(rng.integers(1, 4)) if rp is None else controller(rp, n_turn)[0]
             n_turn = n_turn + 1 if ac in (2, 3) else 0
             if t == a.t_vis + a.t_blind - 1 and rp is not None:                      # position drift of the decoded pose at the end of the blackout
                 tp = rel_pose(env.pos, env.heading, pos0, hd0); drift.append(float(np.hypot(rp[2] - tp[2], rp[3] - tp[3])))
