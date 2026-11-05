@@ -26,7 +26,7 @@ for f in glob.glob("results/homing/*_k*.json"):
     if env == "arena" and (d.get("turn_noise", 0) > 0) != bool(a.tn): continue
     ro = d["readout"]; k = d["t_blind"]
     succ = [float(x < d["radius"]) for x in d["per_episode_final"]]
-    key = (env, w if ro in ("state", "mlp") else ro, ro, k); rows.setdefault(key, []).append((succ, d.get("per_episode_drift", [])))
+    key = (env, w if ro in ("state", "mlp", "policy") else ro, ro, k); rows.setdefault(key, []).append((succ, d.get("per_episode_drift", [])))
 
 def ci(x):
     x = np.asarray(x, float); b = [rng.choice(x, len(x)).mean() for _ in range(a.boot)]
@@ -36,8 +36,8 @@ rows2 = {}  # T2 Continue: (env, wiring/readout, k) -> list of (success, spl) pe
 for f in glob.glob("results/goalnav/*_bumper_k*.json"):
     d = json.load(open(f)); m = re.match(r"^(.*)_K1_s(\d+)(_nyc)?$", d["run"])
     if not m: continue
-    w = m.group(1) if d["readout"] in ("state", "mlp") else d["readout"]
-    if d["readout"] in ("state", "mlp") and d["readout"] != a.readout: continue
+    w = m.group(1) if d["readout"] in ("state", "mlp", "policy") else d["readout"]
+    if d["readout"] in ("state", "mlp", "policy") and d["readout"] != a.readout: continue
     rows2.setdefault((d["env"], w, d["blackout"]), []).append((d["success"], d["spl"]))
 envs = [e for e in ("arena", "nyc") if any(k[0] == e for k in rows)]
 if not envs: raise SystemExit("no results/homing/*_k*.json yet")
