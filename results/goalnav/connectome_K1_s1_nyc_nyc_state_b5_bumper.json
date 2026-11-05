@@ -1,0 +1,18 @@
+{
+ "run": "connectome_K1_s1_nyc",
+ "env": "nyc",
+ "readout": "state",
+ "controller": "bumper",
+ "appearance": "clear",
+ "blackout": 5,
+ "blackout_at": 6,
+ "steps": 40,
+ "episodes": 30,
+ "tol_deg": 45.0,
+ "max_turns": 8,
+ "fit_rollouts": 100,
+ "success": 0.13333333333333333,
+ "spl": 0.13333333333333333,
+ "dist_start": 78.50561359438113,
+ "dist_final": 94.31284388819192
+}

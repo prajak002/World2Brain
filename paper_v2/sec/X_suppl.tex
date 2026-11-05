@@ -70,16 +70,32 @@ the GRU's width; ``rand@CX'' is a random subset the size of the central complex.
     GRU, param.-matched & arena & state & 0.22 / 0.15 & 0.22 / 0.14 & 0.22 / 0.16 \\
     GRU, budget-matched & arena & state & 0.23 / 0.14 & 0.23 / 0.11 & 0.23 / 0.13 \\
     \midrule
-    connectome & NYC & oracle & 0.28 / 0.25 & -- & 0.28 / 0.25 \\
-    connectome & NYC & random & 0.00 / 0.00 & -- & 0.00 / 0.00 \\
-    connectome & NYC & state & 0.05 / 0.05 & -- & 0.04 / 0.04 \\
-    block-shuffled & NYC & state & 0.05 / 0.05 & -- & 0.03 / 0.03 \\
-    GRU, param.-matched & NYC & state & 0.09 / 0.08 & -- & 0.07 / 0.07 \\
+    connectome & NYC, greedy & oracle & 0.28 / 0.25 & -- & 0.28 / 0.25 \\
+    connectome & NYC, greedy & state & 0.05 / 0.05 & -- & 0.04 / 0.04 \\
+    \midrule
+    connectome & NYC, bumper & oracle & 0.83 / 0.78 & 0.83 / 0.78 & 0.83 / 0.78 \\
+    connectome & NYC, bumper & random actions & 0.00 / 0.00 & 0.00 / 0.00 & 0.00 / 0.00 \\
+    connectome & NYC, bumper & state (ridge) & 0.18 / 0.18 & 0.21 / 0.21 & 0.17 / 0.17 \\
+    connectome & NYC, bumper & state (MLP) & 0.27 / 0.25 & -- & -- \\
+    block-shuffled & NYC, bumper & state & 0.10 / 0.10 & 0.14 / 0.14 & 0.13 / 0.13 \\
+    random & NYC, bumper & state & 0.06 / 0.05 & 0.02 / 0.02 & 0.04 / 0.04 \\
+    transformer & NYC, bumper & state & 0.16 / 0.15 & 0.14 / 0.14 & 0.16 / 0.15 \\
+    GRU, param.-matched & NYC, bumper & state & 0.11 / 0.11 & 0.11 / 0.11 & 0.12 / 0.12 \\
+    GRU, param.-matched & NYC, bumper & state (MLP) & 0.17 / 0.16 & -- & -- \\
+    \midrule
+    connectome & NYC dusk / overcast / fog / night & state & 0.23 / 0.20 / 0.17 / 0.13 & -- & -- \\
+    block-shuffled & NYC dusk / overcast / fog / night & state & 0.13 / 0.10 / 0.10 / 0.00 & -- & -- \\
+    transformer & NYC dusk / overcast / fog / night & state & 0.13 / 0.17 / 0.13 / 0.17 & -- & -- \\
+    GRU, param.-matched & NYC dusk / overcast / fog / night & state & 0.13 / 0.13 / 0.20 / 0.13 & -- & -- \\
     \bottomrule
   \end{tabular}}
-  \caption{Goal-vector navigation: success / SPL~\cite{anderson2018evaluation}, 50 episodes per seed, 3 seeds for
-  state readouts. The vision cut lasts 3 or 5 steps from step 6. No wiring beats any other; all are near the
-  random-action level and far below the oracle.}
+  \caption{Goal-vector navigation: success / SPL~\cite{anderson2018evaluation}. Arena: 50 episodes per seed, 3 seeds.
+  NYC: 30 episodes per seed, 3 seeds for state readouts, goals 30 to 60\,m. The vision cut lasts 3 or 5 steps from
+  step 6. With the greedy controller even the oracle goal vector fails on streets (it walks into buildings), so the NYC
+  rows use a bumper controller (on collision: turn two steps toward the goal side, commit three steps forward), which
+  lifts the oracle to 0.83. Under it the state readouts clear random actions and random wiring, the connectome is the
+  best core (0.18 ridge, 0.27 MLP, seed 0), and the vision cut barely matters: the readout, not vision loss, is the
+  limit. The last block is the clear-trained readout evaluated under appearance shifts (seed 0, success only).}
   \label{tab:goalnav}
 \end{table}
 
@@ -136,6 +152,7 @@ rest stay. The heading target of the probe is the integrated continuous yaw, not
 every architecture are in \cref{tab:realvid}; per-clip numbers are in \texttt{results/summary.md}.
 
 \subsection{Teacher-free planning (negative)}
+\label{sec:suppl-plan}
 Latent CEM-MPC with the student as dynamics model succeeds in 0 to 3\,\% of arena navigation episodes for every
 wiring, while the same planner with oracle dynamics succeeds in 100\,\% and a scripted policy in 100\,\%; on the NYC
 twin student-model planning is at 0\,\% under clear, dusk, night, fog and overcast appearance. The students' 8-step

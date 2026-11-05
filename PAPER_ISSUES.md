@@ -8,6 +8,8 @@ Numbers below were recomputed from `data/connectome.npz`, `results/runs/*.json` 
 
 **Status 2026-10-31:** code fixes for B1-B9, B11-B14 and the A-row efficiency / K=3 items are in (see README "Issue fixes" and GitHub issues #1-#13); the rerun is `scripts/run_v2.sh`. Planner diagnosis: the CEM search is fine with oracle dynamics + oracle cost (90 % success); the student goal-latent cost is what fails (0 % even with oracle dynamics).
 
+**Status 2026-11-05 (evening):** NYC closed loop (#9, #10) done. Latent-cost MPC stays a negative result. Goal-vector navigation from a ridge readout of the state with a bumper controller (`scripts/eval_goalnav.py --controller bumper`, 69-job sweep `scripts/run_l4_goalnav.sh`): oracle 0.83 success / 0.78 SPL, random actions 0.00, connectome 0.18 (3 seeds; MLP readout 0.27), transformer 0.16, GRU 0.11, block-shuffled 0.10, random wiring 0.06; vision cut of 3/5 steps changes it by at most 0.03; appearance shifts (dusk/overcast/fog/night) hold for the connectome 0.13-0.23. Table `tab:goalnav` in `paper_v2/sec/X_suppl.tex`, numbers in `results/summary.md` E10.
+
 **Status 2026-11-05:** run 2 (L4, `scripts/run_l4.sh`) arena stage done with the fixed controls: connectome 0.419 / 0.709 vs block-shuffled 0.426 / 0.711 vs random 0.459 / 0.690 vs transformer 0.402 / 0.611 vs GRU 0.348 / 0.525 (h1 / h8 blind MSE, 3 seeds). B1 is therefore answered in the negative for prediction: the claim must be region-level architecture + state structure, not synapse identity. Probes, homing and real video pending (stages `hd homing`, `run_l4_realvid.sh`). New issues #17-#24 in section F (GitHub numbers).
 
 ---
@@ -138,7 +140,7 @@ confounds in B fixed and a much stronger head-direction story.
 | 17 | P0 | Amitava sir | Abstract/intro frame the 1.5 % edge over block-shuffled as the result; h8 tie with random wiring unstated | lead with the negative prediction result, then the state-structure finding; add the h8 row | `.github/issues/17-reframe-negative-result.md` |
 | 24 | P2 | Priyanshi | Only a GRU as the gated baseline | unidirectional LSTM, same 3.71 M budget, 3 seeds; BiLSTM is non-causal and must not be used | `24-lstm-baseline.md` |
 | 18 | P0 | Atharva | No task where the connectome beats the matched GRU outright | blind homing on continuous turns, blackout 8:24 / 4:24, action-noise heading; report success not just R² | `18-outright-win-task.md` |
-| 20 | P0 | Priyanshi | No closed-loop result on real scenes | splat twins of the phone clips + env wrapper + planner with blackout; SPL / success / collision; depends on #9 goal-cost fix | `20-splat-twins-closed-loop.md` |
+| 20 | P0 | Priyanshi | No closed-loop result on real scenes | splat twins of the phone clips + env wrapper + planner with blackout; SPL / success / collision; #9 done 2026-11-05: use `--controller bumper` and the state readout | `20-splat-twins-closed-loop.md` |
 | 21 | P1 | Prajak | Heading in the state is a by-product the loss never asks for | auxiliary CX dead-reckoning loss or across-blackout contrastive term; ablate | `21-structure-aware-objective.md` |
 | 19 | P1 | Atharva | One graph, one species | ablation stage on new controls, K=1-3 with CIs, second connectome | `19-scale-beyond-one-graph.md` |
 | 22 | P2 | Priyanshi | Single ViT-B teacher; real-video actions are flow-estimated | ViT-L 384 px; RECON / SCAND with real odometry | `22-teacher-and-odometry.md` |
