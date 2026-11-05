@@ -1,0 +1,18 @@
+{
+ "run": "gru_K1_s0_nyc",
+ "env": "nyc",
+ "readout": "state",
+ "controller": "bumper",
+ "appearance": "clear",
+ "blackout": 0,
+ "blackout_at": 6,
+ "steps": 40,
+ "episodes": 30,
+ "tol_deg": 45.0,
+ "max_turns": 8,
+ "fit_rollouts": 100,
+ "success": 0.06666666666666667,
+ "spl": 0.06666666666666667,
+ "dist_start": 78.50561359438113,
+ "dist_final": 99.06182050185748
+}

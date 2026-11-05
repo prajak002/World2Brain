@@ -304,7 +304,7 @@ That is main-track material, not a spotlight. The items below are ordered by lev
 | work | owner | issue | where to start |
 |---|---|---|---|
 | Run 2 on the L4 (tn, nyc, probes, homing, real video) and `num.tex` | Prajak | #1-#13 | `scripts/run_l4.sh`, `scripts/make_paper_tables.py` |
-| Closed-loop navigation on the NYC digital twin (planner goal cost, blackout-in-the-loop) | Prajak | #9 | `scripts/eval_plan.py`, `scripts/eval_goalnav.py` |
+| Closed-loop navigation on the NYC digital twin (planner goal cost, blackout-in-the-loop) | Prajak | #9 done 2026-11-05 (oracle 0.83, connectome 0.18, GRU 0.11, random wiring 0.06) | `scripts/run_l4_goalnav.sh`, `results/summary.md` E10 |
 | A task the connectome wins outright | Atharva | #18 | `scripts/eval_homing.py`, `scripts/eval_hd.py`, run 2 `_tn` / `_b8_24` outputs |
 | Graph neural network student (message passing on the connectome) | Atharva | #23 | `wm2cx/student.py` (`FlyBrain`), `wm2cx/transformer.py` as the template for a new `--wiring` |
 | Closed-loop navigation on real crowded-scene video (splat twins of the phone clips) | Priyanshi | #20 | `scripts/ingest_video.py`, `data/realvid_all.npz`, `wm2cx/env.py` interface |
