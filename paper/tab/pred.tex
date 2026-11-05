@@ -1,20 +1,26 @@
 \begin{tabular}{lcccccc}
     \toprule
-    & \multicolumn{2}{c}{Arena (5 seeds)} & \multicolumn{2}{c}{Cont.\ turns (0 seeds)} & \multicolumn{2}{c}{NYC twin (3 seeds)} \\
+    & \multicolumn{2}{c}{Arena (5 seeds)} & \multicolumn{2}{c}{Cont.\ turns (3 seeds)} & \multicolumn{2}{c}{NYC twin (3 seeds)} \\
     \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
     wiring & MSE $\downarrow$ & cos $\uparrow$ & MSE $\downarrow$ & cos $\uparrow$ & MSE $\downarrow$ & cos $\uparrow$ \\
     \midrule
-    GRU, parameter-matched & \textbf{0.434\pm0.004} & \textbf{0.72} & -- & -- & \textbf{0.609\pm0.003} & \textbf{0.56} \\
+    GRU, parameter-matched & \textbf{0.435\pm0.003} & \textbf{0.72} & \textbf{0.430\pm0.003} & \textbf{0.71} & \textbf{0.588\pm0.009} & \textbf{0.53} \\
+    Transformer, parameter-matched & 0.502\pm0.001 & 0.67 & 0.502\pm0.008 & 0.66 & 0.605\pm0.006 & 0.51 \\
     GRU, recurrent-budget-matched & 0.501\pm0.001 & 0.67 & -- & -- & -- & -- \\
     dense & 0.562\pm0.004 & 0.63 & -- & -- & -- & -- \\
     connectome, unsigned & 0.573\pm0.001 & 0.63 & -- & -- & -- & -- \\
     connectome, random signs & 0.578\pm0.001 & 0.62 & -- & -- & -- & -- \\
-    \textbf{connectome} & 0.579\pm0.003 & 0.62 & -- & -- & 0.701\pm0.010 & 0.47 \\
-    random & 0.583\pm0.002 & 0.61 & -- & -- & 0.707\pm0.007 & 0.48 \\
-    block-shuffled & 0.585\pm0.005 & 0.61 & -- & -- & 0.726\pm0.014 & 0.45 \\
+    \textbf{connectome} & 0.579\pm0.002 & 0.62 & 0.571\pm0.001 & 0.61 & 0.636\pm0.011 & 0.47 \\
+    connectome + cell-type attention & 0.579\pm0.002 & 0.62 & -- & -- & -- & -- \\
+    random & 0.583\pm0.002 & 0.61 & 0.582\pm0.002 & 0.60 & 0.639\pm0.004 & 0.47 \\
+    block-shuffled & 0.585\pm0.004 & 0.61 & 0.578\pm0.006 & 0.60 & 0.665\pm0.004 & 0.44 \\
     degree-shuffled & 0.610\pm0.002 & 0.59 & -- & -- & 0.731\pm0.005 & 0.45 \\
+    connectome, attention input & 0.727\pm0.019 & 0.48 & -- & -- & -- & -- \\
+    block-shuffled, attention input & 0.733\pm0.022 & 0.47 & -- & -- & -- & -- \\
+    GRU, attention input & 0.448\pm0.003 & 0.71 & -- & -- & -- & -- \\
+    Transformer, attention input & 0.504\pm0.012 & 0.67 & -- & -- & -- & -- \\
     \midrule
-    copy last visible latent & 0.811 & -- & -- & -- & 1.558 & -- \\
-    constant mean & 0.992 & -- & -- & -- & 0.977 & -- \\
+    copy last visible latent & 0.811 & -- & 0.806 & -- & 0.607 & -- \\
+    constant mean & 0.992 & -- & 0.968 & -- & 0.843 & -- \\
     \bottomrule
 \end{tabular}
