@@ -2,7 +2,7 @@
 title: "[P0] Reframe the paper around the negative prediction result"
 labels: P0, writing
 ---
-**Owner:** Amitava sir  ·  **Priority:** P0  ·  **Paper files:** `paper_v2/sec/0_abstract.tex`, `sec/1_intro.tex`, scorecard in `sec/4_experiments.tex`
+**Owner:** Amitava sir  ·  **Priority:** P0  ·  **Paper files:** `paper_v2/main.tex`, `sec/1_intro.tex`
 
 ## What the data says (run 2, 3 seeds, blind latent MSE at horizon 1 / 8, lower is better)
 | core | h1 | h8 |

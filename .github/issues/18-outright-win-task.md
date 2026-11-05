@@ -17,4 +17,4 @@ Right now the paper can only say "the connectome *encodes* heading where the GRU
 Run all three seeds for every condition, report whichever wins honestly, and never pick the blackout length after seeing the result.
 
 ## Done when
-One table where connectome > GRU with non-overlapping CIs, plus the conditions where it does not, both in `paper_v2/sec/4_experiments.tex`.
+One table where connectome > GRU with non-overlapping CIs, plus the conditions where it does not, both in `paper_v2/main.tex`.
