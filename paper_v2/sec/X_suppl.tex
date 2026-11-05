@@ -1,0 +1,156 @@
+\section{Supplementary material}
+
+\subsection{Extended probe results}
+\label{sec:suppl-probe}
+\cref{tab:suppl-probe} gives the per-population and feature-count-matched probes for the arena (seed 0), the MLP
+probe on all wirings, and the NYC dark-duration numbers. ``all@762'' is a random 762-neuron subset of the student,
+the GRU's width; ``rand@CX'' is a random subset the size of the central complex.
+
+\begin{table}[h]
+  \centering\small
+  \setlength{\tabcolsep}{3pt}
+  \resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccccc}
+    \toprule
+    wiring & all & all@762 & CX & rand@CX & EPG & MLP, all \\
+    \midrule
+    connectome & 8.5 & 18.9 & 12.6 & 10.7 & 50.1 & 4.7\pm0.1 \\
+    connectome, random signs & 7.9 & 16.8 & 11.7 & 10.4 & 44.0 & 4.7\pm0.3 \\
+    block-shuffled & 11.1 & 20.9 & 14.4 & 13.2 & 38.5 & 5.9\pm0.3 \\
+    degree-shuffled & 12.6 & 20.1 & 14.1 & 15.0 & 35.2 & 6.9\pm0.7 \\
+    random & 12.8 & 19.2 & 14.5 & 14.4 & 37.3 & 6.4\pm0.4 \\
+    connectome, unsigned & 12.8 & 20.6 & 13.9 & -- & 34.2 & -- \\
+    dense & 21.5 & 28.8 & 25.2 & 23.7 & 39.8 & 41\pm24 \\
+    GRU, parameter-matched & 31.6 & -- & -- & -- & -- & 27.4\pm0.3 \\
+    GRU, recurrent-budget-matched & 35.2 & -- & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}}
+  \caption{Median heading error (\degree) in the 8:16 blind window, arena, seed 0 (MLP column: mean\pm sd over 3
+  seeds). The EPG population alone carries almost no heading; the central complex decodes no better than a random
+  subset of its size.}
+  \label{tab:suppl-probe}
+\end{table}
+
+\begin{table}[h]
+  \centering\small
+  \resizebox{\linewidth}{!}{%
+\begin{tabular}{lcc}
+    \toprule
+    wiring (NYC) & 16 dark (8:24) & 20 dark (4:24) \\
+    \midrule
+    connectome & 12.2\pm2.2, 0.88 & 9.5\pm1.3, 0.88 \\
+    block-shuffled & 16.4\pm1.5, 0.86 & 12.2\pm2.0, 0.84 \\
+    degree-shuffled & 25.2\pm1.8, 0.69 & 15.9\pm0.7, 0.73 \\
+    random & 21.6\pm1.1, 0.80 & 14.0\pm0.3, 0.83 \\
+    GRU, parameter-matched & 49.4\pm1.9, 0.08 & 39.8\pm1.5, 0.25 \\
+    \bottomrule
+  \end{tabular}}
+  \caption{Dark duration on the NYC twin: heading error (\degree) and position $R^2$, ridge probe, 3 seeds.}
+  \label{tab:suppl-dark-nyc}
+\end{table}
+
+\subsection{Goal-vector navigation}
+\label{sec:suppl-goalnav}
+\begin{table}[h]
+  \centering\small
+  \setlength{\tabcolsep}{3pt}
+  \resizebox{\linewidth}{!}{%
+\begin{tabular}{llcccc}
+    \toprule
+    wiring & env & readout & no cut & cut 3 & cut 5 \\
+    \midrule
+    connectome & arena & oracle goal vector & 0.92 / 0.70 & 0.92 / 0.70 & 0.92 / 0.70 \\
+    connectome & arena & random actions & 0.14 / 0.12 & 0.14 / 0.12 & 0.14 / 0.12 \\
+    connectome & arena & state (ridge) & 0.22 / 0.16 & 0.22 / 0.15 & 0.22 / 0.14 \\
+    connectome & arena & state (MLP) & 0.24 / 0.15 & -- & -- \\
+    block-shuffled & arena & state & 0.24 / 0.15 & 0.23 / 0.14 & 0.21 / 0.13 \\
+    degree-shuffled & arena & state & 0.22 / 0.13 & 0.23 / 0.14 & 0.21 / 0.13 \\
+    random & arena & state & 0.21 / 0.13 & 0.21 / 0.12 & 0.19 / 0.12 \\
+    dense & arena & state & 0.20 / 0.12 & 0.21 / 0.12 & 0.22 / 0.12 \\
+    GRU, param.-matched & arena & state & 0.22 / 0.15 & 0.22 / 0.14 & 0.22 / 0.16 \\
+    GRU, budget-matched & arena & state & 0.23 / 0.14 & 0.23 / 0.11 & 0.23 / 0.13 \\
+    \midrule
+    connectome & NYC & oracle & 0.28 / 0.25 & -- & 0.28 / 0.25 \\
+    connectome & NYC & random & 0.00 / 0.00 & -- & 0.00 / 0.00 \\
+    connectome & NYC & state & 0.05 / 0.05 & -- & 0.04 / 0.04 \\
+    block-shuffled & NYC & state & 0.05 / 0.05 & -- & 0.03 / 0.03 \\
+    GRU, param.-matched & NYC & state & 0.09 / 0.08 & -- & 0.07 / 0.07 \\
+    \bottomrule
+  \end{tabular}}
+  \caption{Goal-vector navigation: success / SPL~\cite{anderson2018evaluation}, 50 episodes per seed, 3 seeds for
+  state readouts. The vision cut lasts 3 or 5 steps from step 6. No wiring beats any other; all are near the
+  random-action level and far below the oracle.}
+  \label{tab:goalnav}
+\end{table}
+
+\subsection{Data efficiency}
+\label{sec:suppl-data}
+\begin{table}[h]
+  \centering\small
+  \resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccc}
+    \toprule
+    train episodes & connectome & block-shuffled & degree-shuffled & GRU \\
+    \midrule
+    50 & 0.970\pm0.009 & 0.989\pm0.009 & 0.955\pm0.013 & \textbf{0.821\pm0.007} \\
+    100 & 0.899\pm0.003 & 0.924\pm0.006 & 0.913\pm0.003 & \textbf{0.762\pm0.016} \\
+    200 & 0.796\pm0.011 & 0.818\pm0.021 & 0.791\pm0.009 & \textbf{0.655\pm0.007} \\
+    500 & 0.677\pm0.003 & 0.702\pm0.015 & 0.713\pm0.004 & \textbf{0.573\pm0.002} \\
+    1000 & 0.579\pm0.003 & 0.585\pm0.005 & 0.610\pm0.002 & \textbf{0.434\pm0.004} \\
+    \bottomrule
+  \end{tabular}}
+  \caption{Blind MSE (arena, mean over horizons, 3 seeds; 5 at 1000) against training-set size. PCA basis fit on the
+  full training set in every row.}
+  \label{tab:data}
+\end{table}
+
+\subsection{Subgraph ablation}
+\begin{table}[h]
+  \centering\small
+  \resizebox{\linewidth}{!}{%
+\begin{tabular}{lccc}
+    \toprule
+    subgraph & connectome & degree-shuffled & margin \\
+    \midrule
+    full graph ($\ge$5 synapses, 91,663 edges) & 0.575 & 0.610 & 0.035 \\
+    $\ge$1 synapse & 0.618 & 0.661 & 0.043 \\
+    $\ge$10 synapses & 0.584 & 0.604 & 0.020 \\
+    central complex only & 0.588 & 0.608 & 0.020 \\
+    mushroom bodies removed & 0.582 & 0.609 & 0.027 \\
+    descending neurons removed & 0.588 & 0.610 & 0.022 \\
+    \bottomrule
+  \end{tabular}}
+  \caption{Blind MSE 8:16, arena, seed 0, real wiring against the degree-shuffled rewiring of the same subgraph. The
+  full-graph margin is 0.035\pm0.005 over 5 seeds.}
+  \label{tab:ablation}\label{sec:ablation}
+\end{table}
+
+\subsection{Real handheld video}
+\label{sec:suppl-realvid}
+The clips are walked with a phone held at chest height; each is centre-cropped to a square, resampled to 2\,Hz and cut
+into non-overlapping 24-step episodes. Yaw per step is the mean horizontal phase-correlation shift over a $4\times4$
+patch grid converted through a 60\degree\ horizontal field of view; forward motion is the mean radial expansion. Steps
+with $|{\rm yaw}| > 6^\circ$ become turn actions, steps with expansion above 1\,px forward, below $-1$\,px back, the
+rest stay. The heading target of the probe is the integrated continuous yaw, not the quantised record, so the
+``actions only'' floor and the probe measure different things on this data. Zero-shot, fine-tuned and probe numbers for
+every architecture are in \cref{tab:realvid}; per-clip numbers are in \texttt{results/summary.md}.
+
+\subsection{Teacher-free planning (negative)}
+Latent CEM-MPC with the student as dynamics model succeeds in 0 to 3\,\% of arena navigation episodes for every
+wiring, while the same planner with oracle dynamics succeeds in 100\,\% and a scripted policy in 100\,\%; on the NYC
+twin student-model planning is at 0\,\% under clear, dusk, night, fog and overcast appearance. The students' 8-step
+rollouts are not accurate enough to plan with. Dropped from the claims.
+
+\subsection{Video}
+The supplementary video (\texttt{wm2cx\_paper.mp4}, generated by \texttt{scripts/make\_video\_paper.py}) shows one
+arena episode side by side for the \vjepa teacher, the connectome-wired student and the parameter-matched GRU: what each
+receives (panorama, fly-eye input, neuron or hidden-unit activity), what each thinks (its latent guess on the teacher's
+2-D latent trajectory, with the cosine match over time) and where each believes it is (the pose decoded from its own
+state, the view rendered there, and the decoded path on the top-down map). The released strip figures are cut from it. A second
+video (\texttt{wm2cx\_realvid.mp4}, \texttt{scripts/make\_video\_realvid.py}) repeats the comparison on a held-out real
+phone clip with both students fine-tuned on the other clips.
+
+\subsection{Reproducibility}
+All results in the paper come from one run on a single RTX 4090 (about 14 GPU-hours): 5 seeds on the arena, 3 on NYC,
+12 wirings, 424 checkpoints. Code, environments, the ingest pipeline for phone video, and the checkpoints are released;
+the \flywire-derived connectome file is rebuilt by one script from the public v783 release.

@@ -22,3 +22,5 @@ data/raw/
 results/runs/*.pt
 logs/
 paper/main.pdf
+paper_v2/main.pdf
+paper_v2/main.blg
