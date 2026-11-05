@@ -281,7 +281,7 @@ input and the hybrid layer do not move the connectome. Read plainly: **on predic
 nothing measurable** (1.5 % over block-shuffled at h1, tied at h8, behind random wiring at h8), and every
 parameter-matched free architecture is well ahead. The paper's positive claim lives entirely in the state probes
 (heading / position decodable during blind windows), blind homing, and the real-video transfer. Those numbers are the
-23 `\TODO` macros in `paper_v2/num_pending.tex` and come from stages `hd homing` + `run_l4_realvid.sh` of run 2.
+the `\TODO` macros in `paper_v2/main.tex` (num_pending block) and come from stages `hd homing` + `run_l4_realvid.sh` of run 2.
 
 Status today: a careful analysis paper with a clean negative on prediction and a mechanistic positive on the state.
 That is main-track material, not a spotlight. The items below are ordered by leverage; 1-3 are this submission,
@@ -309,7 +309,7 @@ That is main-track material, not a spotlight. The items below are ordered by lev
 | Graph neural network student (message passing on the connectome) | Atharva | #23 | `wm2cx/student.py` (`FlyBrain`), `wm2cx/transformer.py` as the template for a new `--wiring` |
 | Closed-loop navigation on real crowded-scene video (splat twins of the phone clips) | Priyanshi | #20 | `scripts/ingest_video.py`, `data/realvid_all.npz`, `wm2cx/env.py` interface |
 | LSTM baseline at the same budget | Priyanshi | #24 | `scripts/train.py --wiring gru` path, `wm2cx/student.py::gru_hidden_for` |
-| Reframe abstract / intro around the negative result | Amitava sir | #17 | `paper_v2/sec/0_abstract.tex`, `sec/1_intro.tex`, scorecard in `sec/4_experiments.tex` |
+| Reframe abstract / intro around the negative result | Amitava sir | #17 | `paper_v2/main.tex` (abstract and introduction blocks) |
 
 ### Graph neural network student (for Atharva; issue #23)
 

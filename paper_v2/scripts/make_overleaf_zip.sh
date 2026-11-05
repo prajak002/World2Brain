@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")/.."
 rm -f ../paper_v2.zip
 COPYFILE_DISABLE=1 zip -X -r ../paper_v2.zip \
-  main.tex preamble.tex num.tex num_pending.tex main.bib cvpr.sty ieeenat_fullname.bst \
-  sec tab fig/*.pdf fig/*.png fig/*.jpg fig/src README.md \
+  main.tex main.bib cvpr.sty ieeenat_fullname.bst \
+  fig/*.pdf fig/*.png fig/*.jpg fig/src README.md \
   -x '*.DS_Store' '__MACOSX/*'
 unzip -l ../paper_v2.zip | tail -1
