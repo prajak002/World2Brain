@@ -11,7 +11,7 @@ import argparse, glob, json, re, os, numpy as np
 import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 
 p = argparse.ArgumentParser(); p.add_argument("--out", default="paper_v2/fig"); p.add_argument("--readout", default="state")
-p.add_argument("--tn", type=int, default=1, help="arena panel: 1 = continuous-turn (_tn) runs, 0 = clean-turn runs"); p.add_argument("--boot", type=int, default=1000)
+p.add_argument("--tn", type=int, default=1, help="arena panel: 1 = continuous-turn (_tn) runs, 0 = clean-turn runs"); p.add_argument("--boot", type=int, default=1000); p.add_argument("--full", type=int, default=0, help="1 = full-brain (_full) checkpoints only, 0 = subcircuit only")
 a = p.parse_args(); rng = np.random.default_rng(0)
 NAMES = {"connectome": "connectome", "block_shuffled": "block-shuffled", "degree_shuffled": "degree-shuffled", "random": "random wiring", "dense": "dense",
          "shuffled": "degree-shuffled", "gru": "GRU (param.-matched)", "gru_budget": "GRU (budget-matched)", "lstm": "LSTM", "transformer": "transformer"}
@@ -21,8 +21,9 @@ COL = {"connectome": "#c0392b", "block_shuffled": "#e67e22", "degree_shuffled": 
 rows = {}   # (env, wiring, readout, k) -> list of per-episode success (pooled over seeds)
 for f in glob.glob("results/homing/*_k*.json"):
     if "_e100" not in f and os.path.exists(f.replace(".json", "_e100.json")): continue   # a 100-episode rerun supersedes the 50-episode file
-    d = json.load(open(f)); m = re.match(r"^(.*)_K1_s(\d+)(_tn)?(_nyc)?$", d["run"])
+    d = json.load(open(f)); m = re.match(r"^(.*)_K1_s(\d+)(_full)?(_tn)?(_nyc)?$", d["run"])
     if not m: continue
+    if bool(m.group(3)) != bool(a.full): continue
     w = m.group(1); env = d["env"]
     if env == "arena" and (d.get("turn_noise", 0) > 0) != bool(a.tn): continue
     ro = d["readout"]; k = d["t_blind"]
@@ -35,8 +36,8 @@ def ci(x):
 
 rows2 = {}  # T2 Continue: (env, wiring/readout, k) -> list of (success, spl) per seed
 for f in glob.glob("results/goalnav/*_bumper_k*.json"):
-    d = json.load(open(f)); m = re.match(r"^(.*)_K1_s(\d+)(_nyc)?$", d["run"])
-    if not m: continue
+    d = json.load(open(f)); m = re.match(r"^(.*)_K1_s(\d+)(_full)?(_nyc)?$", d["run"])
+    if not m or bool(m.group(3)) != bool(a.full): continue
     w = m.group(1) if d["readout"] in ("state", "mlp", "policy") else d["readout"]
     if d["readout"] in ("state", "mlp", "policy") and d["readout"] != a.readout: continue
     rows2.setdefault((d["env"], w, d["blackout"]), []).append((d["success"], d["spl"]))
