@@ -328,27 +328,27 @@ Paper ID *****
 \maketitle
 % ================= sec/0_abstract.tex =================
 \begin{abstract}
-A fruit fly keeps its heading and a vector home for seconds in darkness with a few thousand neurons whose wiring is
-now known synapse by synapse. We ask whether that wiring is a useful prior for a modern video world model, and we
-answer with matched controls rather than a single headline number. We distil the latent dynamics of \vjepa (ViT-B),
-a self-supervised video foundation model, into a leaky recurrent student whose \emph{only} recurrent connections are
-the 91,663 signed synapses among 6,935 neurons of the \flywire \emph{Drosophila} connectome (visual projection, central
-complex, mushroom-body output and descending populations). The student is trained on one objective, next-latent
-prediction under random blackouts of the visual input, and nothing about heading, position or action is supervised.
-Against six wiring controls that fix neuron count, edge count, region block structure and Dale's-law signs, against a
-dense recurrence, and against a parameter-matched GRU and a parameter-matched causal transformer, the connectome is
-\emph{not} the best predictor: the GRU is \nGruBetterArena\,\% better. What the wiring buys is a path-integrating
-state. During 8 blind steps a ridge probe reads heading from the connectome state to \nConnArenaHd\degree\ median error
-and position to $R^2$\,\nConnArenaPos, against \nGruArenaHd\degree\ and \nGruArenaPos\ for the GRU; the code survives
-16 and 20 dark steps, transfers to a raycast twin of Midtown Manhattan and persists under continuous turn angles. The
-state also drives behaviour: with a small policy head cloned from the agent's own blind rollouts, the connectome walks
-back to its start after 24 and 30 dark steps with success \nBkConnArenaTw\ and \nBkConnArenaTh\ against
-\nBkGruArenaTw\ and \nBkGruArenaTh\ for the GRU, with non-overlapping confidence intervals. Sparse
-random and block-shuffled wirings of the same size form the code too, \nConnBlockGapArena\ to
-\nConnBlockGapArenaDarkSixteen\degree\ worse, so the effect belongs to connectome-scale sparse signed recurrence, with a
-small, reproducible bonus for the real synapse list. Coupling two or three copies of the brain through the 40,194 real
-commissural synapses adds neurons but no accuracy. We release both environments, the real-video ingest pipeline, the
-training and evaluation code and all checkpoints.
+\noindent\textbf{Bigger Picture.} The release of the complete adult \emph{Drosophila} connectome has sparked
+excitement across the AI community, with researchers reporting promising results from drone control to language
+modelling. At this point, a fundamental question arises: can biological wiring offer an advantage in learning to
+navigate the world? We investigate this by distilling representations from \vjepa, a state-of-the-art world model,
+and testing real versus artificial wiring in spatial memory and navigation.
+\textbf{What We Did.} We take three steps: (i) \emph{Connectome-Constrained Distillation:} distil \vjepa\ 2.1
+representations into a synapse-constrained recurrent network with 6,935 \flywire\ neurons and 91,663 signed
+synapses; (ii) \emph{Learning Without Navigation Supervision:} train only on next-latent prediction during visual
+blackouts, without heading, position, or navigation supervision; (iii) \emph{Rigorous Evaluation:} compare six
+wiring controls, dense recurrence, and parameter-matched GRU and transformer baselines in synthetic and Manhattan
+environments.
+\textbf{What We Found.} Three findings emerge: (i) \emph{Prediction is not memory:} the GRU achieves
+\nGruBetterArena\% lower MSE (\nGruArenaMse\ vs.\ \nConnArenaMse), but the connectome retains heading
+(\nConnArenaHd\degree\ vs.\ \nGruArenaHd\degree\ error) and position ($R^2=\nConnArenaPos$ vs.\ \nGruArenaPos) after
+eight blind steps. (ii) \emph{Memory survives darkness:} this advantage persists over 16--20 blind steps, continuous
+turns, and Manhattan simulations, and with a small policy head the connectome walks back to its start after 24--30
+dark steps with success \nBkConnArenaTw--\nBkConnArenaTh\ against \nBkGruArenaTw--\nBkGruArenaTh\ for the GRU.
+(iii) \emph{Wiring matters, but sparsity matters more:} random and shuffled graphs also develop spatial memory; real
+wiring improves heading by \nConnBlockGapArena--\nConnBlockGapArenaDarkSixteen\degree\ over block-shuffled controls,
+while coupling additional connectome copies brings no gain. Our conclusion: real wiring modestly improves spatial
+memory but offers no consistent navigation advantage over artificial wiring.
 \end{abstract}
 % ================= sec/1_intro.tex =================
 \section{Introduction}
