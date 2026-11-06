@@ -305,11 +305,12 @@
 \providecommand{\nGruRvTransferHd}{\TODO{GruRvTransferHd}}
 \providecommand{\nTfNycSucc}{\TODO{TfNycSucc}}
 % ---- Blackout return, policy head (results/blackout_table.md, 100 episodes, radius 2 units / 12 m) ----
+\newcommand{\supp}[1]{\cref{#1} in the supplement}
 \providecommand{\nBkConnArenaTw}{0.69}\providecommand{\nBkConnArenaTwLo}{0.62}\providecommand{\nBkConnArenaTwHi}{0.75}
 \providecommand{\nBkConnArenaTh}{0.71}\providecommand{\nBkConnArenaThLo}{0.65}\providecommand{\nBkConnArenaThHi}{0.78}
 \providecommand{\nBkGruArenaTw}{0.45}\providecommand{\nBkGruArenaTwLo}{0.35}\providecommand{\nBkGruArenaTwHi}{0.55}
 \providecommand{\nBkGruArenaTh}{0.52}\providecommand{\nBkGruArenaThLo}{0.42}\providecommand{\nBkGruArenaThHi}{0.62}
-\providecommand{\nBkConnNycTh}{0.58}\providecommand{\nBkConnNycThLo}{0.48}\providecommand{\nBkConnNycThHi}{0.67}
+\providecommand{\nBkConnNycTh}{0.58}\providecommand{\nBkConnNycThLo}{0.49}\providecommand{\nBkConnNycThHi}{0.68}
 \providecommand{\nBkGruNycTh}{0.31}\providecommand{\nBkGruNycThLo}{0.22}\providecommand{\nBkGruNycThHi}{0.40}
 \definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
 \usepackage[breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
@@ -387,7 +388,7 @@ public~\cite{seelig2015neural,green2017neural,turnerevans2017angular,dorkenwald2
 This paper puts the two together and asks one plain question: \emph{if a world model's recurrence is forced to be the
 fly's wiring diagram, what does the wiring buy?} We distil \vjepa~\cite{assran2025vjepa2} into a leaky rate network of
 6,935 \flywire neurons whose only recurrent weights sit on the 91,663 signed synapses of the real connectome
-(\cref{fig:pipeline}). The student never sees the teacher's weights, only its latent through the loss, and is trained on
+(\cref{fig:pipeline}; one episode in \cref{fig:teaser}). The student never sees the teacher's weights, only its latent through the loss, and is trained on
 one objective: next-latent prediction under random blackouts of the visual input.
 
 \paragraph{Why distillation, and why this kind}
@@ -436,7 +437,8 @@ bonus, not the cause.
         with information-ceiling, continuous-turn, feature-count and non-linearity controls (\cref{sec:probes}).
   \item A behavioural test of that code (blind homing, goal-vector navigation) with oracle, dead-reckoning and random
         controls, reported in full including the negative outcomes, plus real phone video as a third world
-        (\cref{sec:behaviour,sec:realvid}).
+        (\cref{sec:behaviour,sec:realvid}); with a policy head cloned from the agent's own dark rollouts, the state
+        supports blind return over 24 to 30 dark steps at about twice the GRU's success (\cref{sec:blackout}).
   \item Two simulated environments, the real-video ingest pipeline, all code and checkpoints, released.
 \end{itemize}
 % ================= sec/2_related.tex =================
@@ -467,7 +469,7 @@ visual system fit to motion tasks~\cite{lappalainen2024connectome}, whole-brain 
 simulation~\cite{shiu2024drosophila}, mechanistic central-complex models~\cite{hulse2021connectome,stone2017anatomically}
 and small wiring motifs for control~\cite{lechner2020neural,goulas2021bio}. These fit neural data or hand-designed
 tasks; we distil a self-supervised video model into the wiring and measure, with matched controls, what the wiring does
-to a world model (\cref{tab:prior}).
+to a world model (\supp{tab:prior}).
 
 \paragraph{Path integration and null models}
 RNNs trained to localise from velocity develop grid- and head-direction codes~\cite{cueva2018emergence,banino2018vector,
@@ -527,12 +529,12 @@ parameters; $W_{\rm in}$ and the readout add 3.6\,M, identical for every sparse 
 \label{sec:multi-method}
 A single fly brain has a fixed neuron count. To ask whether the connectome is \emph{capacity}-limited rather than
 \emph{wiring}-limited we clone the whole subgraph $K$ times and couple the copies through the real commissural
-edges only (\cref{fig:multi}). The construction keeps every control valid: edge count scales exactly by $K$, degrees
+edges only (\supp{fig:multi}). The construction keeps every control valid: edge count scales exactly by $K$, degrees
 are preserved per copy, and Dale's signs are untouched. We run $K\in\{1,2,3\}$ with five seeds each.
 
 \subsection{Sparse state versus dense state: the controls}
 \label{sec:controls}
-Every sparse control (\cref{fig:controls}) keeps the neuron set, the region labels, input and output routing, the
+Every sparse control (\supp{fig:controls}) keeps the neuron set, the region labels, input and output routing, the
 exact edge count, no self-loops and Dale-consistent signs at the real excitatory fraction. \textbf{Block-shuffled}
 applies Maslov--Sneppen rewiring~\cite{maslov2002specificity} inside each region-to-region block, preserving per-block
 in- and out-degrees and all block edge counts. \textbf{Degree-shuffled} rewires globally. \textbf{Random} is
@@ -553,7 +555,7 @@ $\epsilon\sim\mathcal{N}(0,0.3)$, so heading is no longer a linear function of t
 \textbf{Arena.} A 360\degree\ cylindrical panorama at 256\,px with coloured blocks; tasks \textsc{nav} and
 \textsc{arrange}; five actions (stay, forward 0.6, turn $\pm22.5$\degree, back 0.36); 24-step scripted episodes; 1,000
 train, 200 test. \textbf{NYC twin.} A raycast model of Midtown Manhattan from building footprints; 110\degree\ camera,
-forward 4\,m, back 2\,m, goals 30 to 60\,m; 600 episodes split \emph{geographically} into train and test street blocks.
+forward 3\,m, back 2\,m, goals 30 to 60\,m; 600 episodes split \emph{geographically} into train and test street blocks.
 \textbf{Real video.} \nRvClips\ phone clips walked through city streets, \nRvEpisodes\ episodes of 24 steps at 2\,Hz; yaw
 and forward motion estimated by patch phase correlation and quantised to the five actions (\cref{sec:suppl-realvid}). A
 test set only, except in the leave-one-clip-out fine-tuning condition. \textbf{Blackouts.} Test windows are steps 8 to
@@ -570,7 +572,7 @@ and random actions. \nSeeds\ seeds on the arena, \nSeedsNyc\ on NYC; mean\pm sd 
 % ================= sec/4_experiments.tex =================
 \section{Experiments}
 \label{sec:exp}
-Every number below is generated from the released result files by the table script in the repository; numbers that run 2 has not yet produced appear as red placeholders.
+Every number below is generated from the released result files by the table script in the repository.
 
 \subsection{Benchmark 1: blind latent prediction}
 \label{sec:pred}
@@ -616,7 +618,7 @@ even the GRU matched to the connectome's recurrent budget (174 units) is better.
 stable across seeds and worlds: connectome $<$ random $<$ block-shuffled $<$ degree-shuffled, with the real wiring
 \nConnOverBlockArena\,\% ahead of block-shuffled on the arena and \nConnOverBlockNyc\,\% on NYC (paired over shared
 test episodes, $p<0.001$ for every seed). Removing or permuting Dale's signs does not hurt prediction. Data efficiency
-(50 to 1,000 training episodes) leaves the ordering unchanged (\cref{fig:curves}b, \cref{sec:suppl-data}).
+(50 to 1,000 training episodes) leaves the ordering unchanged (\supp{fig:curves}b, \cref{sec:suppl-data}).
 
 \subsection{Benchmark 2: path integration read from the state}
 \label{sec:probes}
@@ -662,10 +664,10 @@ latent far better, gives \nGruArenaHd\degree\ / \nGruArenaPos\ and \nGruNycHd\de
 make the reading safe. (i) The actions-only floor is \nActOnlyArenaHd\degree, so the probe is reading an integral held
 by the state, not the raw action input. (ii) A random 762-neuron subset of the connectome (the GRU's width) still beats
 the GRU, so feature count is not the explanation (\cref{sec:suppl-probe}). (iii) An MLP probe tightens the connectome
-to \nConnArenaMlpHd\degree\ and the GRU only to \nGruArenaMlpHd\degree\ (\cref{tab:dark}), so the GRU's code is not
+to \nConnArenaMlpHd\degree\ and the GRU only to \nGruArenaMlpHd\degree\ (\supp{tab:dark}), so the GRU's code is not
 merely non-linear. (iv) With continuous turn angles the action record no longer determines heading; the continuous-turn probe columns of
-\cref{tab:probe} are filled by run 2 (\nSeedsTn\ seeds at the time of writing), and the homing result on that data is
-already in \cref{tab:homing}. The code degrades gracefully (\cref{fig:curves}a, \cref{fig:strip}): at 16 dark steps the connectome holds
+\cref{tab:probe} use \nSeedsTn\ seeds, and the homing result on that data is
+already in \supp{tab:homing}. The code degrades gracefully (\cref{fig:curves}a and \cref{fig:strip} in the supplement): at 16 dark steps the connectome holds
 \nConnArenaDarkSixteenHd\degree\ against \nGruArenaDarkSixteenHd\degree\ for the GRU, and the real wiring's margin over
 block-shuffled grows from \nConnBlockGapArena\degree\ to \nConnBlockGapArenaDarkSixteen\degree. Signs matter here where
 they did not for prediction: the unsigned graph loses 5\degree. The 51 EPG neurons alone carry almost no heading
@@ -673,7 +675,7 @@ they did not for prediction: the unsigned graph loses 5\degree. The 51 EPG neuro
 
 \subsection{Single versus multiple connectomes}
 \label{sec:multi}
-Doubling or tripling the brain (\cref{tab:multi}, \cref{fig:curves}c) changes blind MSE by less than one seed standard deviation and
+Doubling or tripling the brain (\supp{tab:multi}, \supp{fig:curves}c) changes blind MSE by less than one seed standard deviation and
 leaves the heading code where it was. The sparse student is therefore not short of neurons or synapses; the gap to
 the GRU is a property of the fixed sparse topology, not of its size. One real brain is enough, and we use $K=1$
 everywhere else.
@@ -691,9 +693,9 @@ the same neurons predicts better than the connectome (0.562 vs 0.579) but integr
 \subsection{Benchmark 3: behaviour from the code}
 \label{sec:behaviour}
 A linear readout of the connectome state drives blind homing to \nConnNycSucc\ success on NYC and \nConnArenaSucc\ on
-the arena (\cref{tab:homing}, \cref{fig:homing}), well above the random-action floor and the GRU (\nGruNycSucc, \nGruArenaSucc) but far
-below the dead-reckoning ceiling (0.92, 1.00). Block-shuffled homes slightly better than the real wiring. Goal-vector
-navigation toward a decoded goal (\cref{tab:goalnav}) reaches 0.18 success on NYC streets for the connectome (0.27 with
+the arena (\supp{tab:homing}, \supp{fig:homing}), well above the random-action floor and the GRU (\nGruNycSucc, \nGruArenaSucc) but far
+below the dead-reckoning ceiling (1.00, 1.00). Block-shuffled homes slightly better than the real wiring. Goal-vector
+navigation toward a decoded goal (\supp{tab:goalnav}) reaches 0.18 success on NYC streets for the connectome (0.27 with
 an MLP readout) against 0.06 for random wiring, 0.11 for the GRU, 0.00 for random actions and 0.83 for the oracle pose
 with the same bumper controller; a 3- or 5-step vision cut changes it by at most 0.03. The controller is not the
 bottleneck (the oracle reaches 0.83); the readout is. Latent-cost MPC on the same students fails outright (\cref{sec:suppl-plan}).
@@ -710,13 +712,13 @@ bottleneck (the oracle reaches 0.83); the readout is. Latent-cost MPC on the sam
   agent's \emph{own} dark rollouts, identically for every network. Dashed lines are the oracle pose (ceiling), dead
   reckoning of the action sequence, and random actions (floor); at $k=8$ nobody has time to walk back, so the
   memory-limited region is $k\ge16$. Shading is a 95\,\% bootstrap interval over episodes (100 per cell at $k=24$ and
-  $30$, 50 elsewhere). The connectome state supports return well beyond the GRU at every memory-limited $k$; the dense
-  recurrence collapses.}
+  $30$, 50 elsewhere). The connectome state supports return above the GRU at every memory-limited $k$, with non-overlapping intervals at
+  $k=24$ and $30$ (100 episodes); the dense recurrence collapses.}
   \label{fig:blackout}
 \end{figure*}
 \begin{table}[t]
   \centering\footnotesize
-  \caption{\textbf{Blind return success} with the policy head, 100 episodes per cell, 95\,\% bootstrap interval.
+  \caption{\textbf{Blind return success} with the policy head, 100 episodes per cell (dense: 50), 95\,\% bootstrap interval.
   Arena: continuous turns, 2 seeds pooled; NYC twin: seed 0.}
   \label{tab:blackout}
   \setlength{\tabcolsep}{3pt}\resizebox{\columnwidth}{!}{\begin{tabular}{lccc}
@@ -737,7 +739,8 @@ bottleneck (the oracle reaches 0.83); the readout is. Latent-cost MPC on the sam
 \end{table}
 The homing numbers above are limited by their readout, not by the state: the oracle pose reaches 1.00 through the same
 controller, and \cref{sec:probes} shows that the state holds a position estimate the ridge decoder returns only
-coarsely. We therefore replace the decoder-plus-controller pipeline with a policy head, a two-layer MLP (256 hidden
+coarsely. Success radius is 2 units here, matched to the NYC 12\,m / 3\,m ratio, and the oracle, dead-reckoning and random rows are
+re-run under it. We replace the decoder-plus-controller pipeline with a policy head, a two-layer MLP (256 hidden
 units) from the full recurrent state to the five actions. It is trained by behaviour cloning on 300 rollouts of the
 agent itself: the labels are the oracle actions that would move the agent home from where it \emph{actually} is, so the
 head learns to act on whatever the state encodes, and errors it makes early in the blackout are in its training
@@ -750,16 +753,16 @@ used for every wiring.
 connectome seeds (0.66 and 0.71 at $k=24$, 0.68 and 0.74 at $k=30$) both exceed the GRU's upper bound. The dense
 recurrence, the best predictor among the state-matched networks, collapses to chance once the blackout exceeds 16
 steps. On the NYC twin with 30 dark steps, where a step is 3\,m and the start lies 30\,m away, the connectome returns
-in \nBkConnNycTh\ of episodes and the GRU in \nBkGruNycTh. The ordering reverses the prediction benchmark: the network
-that predicts the teacher worst among the free recurrences holds the state that is most useful for acting in the dark.
+in \nBkConnNycTh\ of episodes and the GRU in \nBkGruNycTh. The ordering reverses the prediction benchmark: the worst
+predictor of the three (\cref{tab:pred}) holds the state that is most useful for acting in the dark.
 Block-shuffled and transformer rows, three seeds per row and the $k=40$ NYC point are pre-registered in the released
-benchmark specification and are part of the camera-ready sweep.
+benchmark specification and not yet run.
 
 \subsection{Benchmark 4: real handheld video}
 \label{sec:realvid}
-Zero-shot, no student beats the copy-last predictor on real footage (\cref{tab:realvid}): the simulator-to-phone gap
+Zero-shot, no student beats the copy-last predictor on real footage (\supp{tab:realvid}): the simulator-to-phone gap
 swamps every architectural difference. After fine-tuning all students land within 7\,\% of each other. The heading
-probe is the informative row (\cref{fig:rvbars}): with the \emph{simulator-fit} readout the connectome and unsigned connectome transfer at
+probe is the informative row (\supp{fig:rvbars}): with the \emph{simulator-fit} readout the connectome and unsigned connectome transfer at
 \nConnArenaRvTransferHd\degree\ and \nNosignArenaRvTransferHd\degree\ while the GRU, random and degree-shuffled states
 do not transfer at all (79 to 89\degree); with an in-domain readout every state decodes heading to 7 to 10\degree.
 
@@ -768,7 +771,7 @@ do not transfer at all (79 to 89\degree); with an in-domain readout every state 
 \begin{table}[t]
   \centering\footnotesize
   \caption{\textbf{Scorecard.} Does the connectome beat each baseline on each benchmark? \checkmark\ yes (5 seeds,
-  paired $p<0.01$; blind return: non-overlapping 95\,\% intervals over 100 episodes); $\approx$ within seed noise;
+  paired $p<0.01$; blind return: non-overlapping 95\,\% bootstrap intervals over 50--100 episodes); $\approx$ within seed noise;
   $\times$ no; -- not run.}
   \label{tab:score}
   \setlength{\tabcolsep}{3pt}\begin{tabular}{lccccc}
@@ -776,7 +779,7 @@ do not transfer at all (79 to 89\degree); with an in-domain readout every state 
     baseline & MSE & heading & homing & blind return & real-video \\
     \midrule
     degree-shuffled & \checkmark & \checkmark & $\approx$ & -- & \checkmark \\
-    random (ER) & \checkmark & \checkmark & \checkmark & -- & \checkmark \\
+    random (ER) & \checkmark & \checkmark & $\approx$ & -- & \checkmark \\
     block-shuffled & \checkmark & \checkmark & $\times$ & -- & -- \\
     random signs & $\approx$ & $\approx$ & -- & -- & -- \\
     unsigned & $\times$ & \checkmark & $\times$ & -- & $\approx$ \\
@@ -802,27 +805,27 @@ carries the margin.
 \label{sec:novelty}
 \paragraph{What is new}
 (i) A student class for world-model distillation whose recurrence is a fixed, signed, synapse-level wiring diagram and
-whose target is a self-supervised video model, not a task loss or recordings (\cref{tab:prior}). (ii) A control ladder
+whose target is a self-supervised video model, not a task loss or recordings (\supp{tab:prior}). (ii) A control ladder
 that separates density, degree sequence, macro-architecture and synapse identity, with identity worth about 1\,\% of
-latent error and 2 to 6\degree\ of heading (\cref{tab:pred,tab:dark}). (iii) An emergent path-integration code that
+latent error and \nConnBlockGapArena\ to \nConnBlockGapArenaDarkSixteen\degree\ of heading (\cref{tab:pred} and \cref{tab:dark} in the supplement). (iii) An emergent path-integration code that
 prediction quality does not explain, surviving 20 dark steps, continuous turns, a non-linear probe, a geographic split
-and transfer to phone video (\cref{tab:probe,tab:dark,tab:realvid}), and usable for blind return where a GRU is not
-(\cref{fig:blackout}). (iv) Scaling a connectome model by cloning it through its 40,194 real commissural synapses, which
-shows it is topology-limited, not size-limited (\cref{tab:multi}). (v) Three worlds, ceilings, floors and every
+and transfer to phone video (\cref{tab:probe} and \cref{tab:dark,tab:realvid} in the supplement), and usable for blind return at roughly twice the GRU's
+success rate (\cref{fig:blackout}). (iv) Scaling a connectome model by cloning it through its 40,194 real commissural synapses, which
+shows it is topology-limited, not size-limited (\supp{tab:multi}). (v) Three worlds, ceilings, floors and every
 negative result.
 
 \paragraph{Two claims that are easy to conflate}
 The first is about a \emph{class} of topology: connectome-scale sparse signed recurrence, trained only to predict a
-video model's latent, holds a state that path-integrates and supports blind return, and neither a GRU nor a
-transformer trained on the same objective at the same budget does. Both predict the latent better, so the code trades
+video model's latent, holds a state that path-integrates, which neither a GRU nor a transformer trained on the same objective at the same
+budget forms, and supports blind return at twice the GRU's rate (the transformer is not yet tested under the policy head). Both predict the latent better, so the code trades
 against prediction rather than following from it. The second is about the \emph{identity} of the real synapses, and
 here the evidence is modest and consistent: about one percent of latent error and a few degrees of heading, present
 across seeds, worlds, data sizes and subgraphs, but never the cause. ``Sparse signed recurrence integrates, and the
 fly's version is a little better'' is the paper. A mechanistic hypothesis is given in \cref{sec:suppl-why}.
 
 \paragraph{Limitations}
-(i) Blind return with the policy head is shown against the GRU and dense cores on two seeds; shuffled wirings and the
-transformer are pre-registered but not yet run under this readout. (ii) Actions are given to the student in the dark.
+(i) Blind return with the policy head uses two connectome seeds and one seed for the GRU, dense and NYC rows; shuffled
+wirings and the transformer are pre-registered but not yet run under this readout. (ii) Actions are given to the student in the dark.
 (iii) The environments are synthetic, and on real video no student beats copy-last zero-shot. (iv) The teacher is
 ViT-B at 256\,px and the NYC twin is one location. (v) The EPG population does not carry the heading code; the
 biological ring attractor does not emerge at this scale and we do not claim it.
@@ -836,7 +839,7 @@ A video foundation model can be distilled into a world model whose recurrence is
 makes it a worse predictor and a better integrator: the state keeps a readable heading and position through the dark
 that neither a GRU nor a transformer trained on the same objective forms, with a small, consistent advantage for the
 real synapses over shuffled ones and no gain from more brains. Read by a policy head, that code becomes behaviour: the
-connectome walks home through 30 dark steps where the GRU mostly fails. Closing the gap to the oracle on the full
+connectome walks home through 30 dark steps where the GRU succeeds roughly half as often. Closing the gap to the oracle on the full
 control set is the open problem, and we release everything needed to work on it.
 {\small
 \bibliographystyle{ieeenat_fullname}
@@ -857,7 +860,8 @@ integral around. The probes on random and shuffled sparse graphs fit this pictur
 
 \subsection{Additional figures and tables}
 \label{sec:suppl-floats}
-Figures and tables referenced from the main text that did not fit the page budget.
+\Cref{fig:envs} shows the three worlds and \cref{fig:activity} the student's state on one episode; \cref{tab:suppl-dark-nyc,tab:data} extend the NYC dark-duration and data-efficiency results.
+Figures and tables referenced from the main text as ``in the supplement''.
 \begin{figure}[t]
   \centering
   \includegraphics[width=0.49\linewidth]{fig/env_nav.png}\hfill
