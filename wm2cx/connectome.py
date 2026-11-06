@@ -5,6 +5,7 @@ Regions ("brains") used as the student's modules (all neuron-level, real root id
   CX  : central complex (EB/PB/FB/NO neurons: EPG, PEN, PEG, Delta7, PFN*, PFL*, hDelta, vDelta, FC, FS, ER ring neurons, ExR ...)
   MB  : mushroom-body output neurons + dopaminergic neurons (MBON, PAM, PPL1) -- valence / memory
   OUT : descending neurons (DN) -- motor output
+  OTH : every other proofread neuron (optic lobes, antennal lobe, LH, SEZ, motor, ...); VIS+CX+MB+OUT+OTH = the full brain
 Edges come from proofread_connections_783 (synapse counts >= min_syn). Sign is taken from the
 presynaptic neuron's predicted neurotransmitter (ACh +, Glu -, GABA -, others +).
 """
@@ -17,6 +18,7 @@ REGION_RULES = {
     "CX":  lambda a: a.cell_class.eq("CX"),
     "MB":  lambda a: a.cell_class.isin(["MBON", "DAN"]),
     "OUT": lambda a: a.super_class.eq("descending"),
+    "OTH": lambda a: a.root_id.notna(),       # every remaining proofread neuron: with VIS/CX/MB/OUT this is the whole brain (full-brain student)
 }
 
 
@@ -63,7 +65,8 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Build the FlyWire subgraph; --min_syn / --regions for the ablations in #13.")
     p.add_argument("--ann", default="data/raw/neuron_annotations.tsv"); p.add_argument("--conn", default="data/raw/proofread_connections_783.feather")
     p.add_argument("--out", default="data/connectome.npz"); p.add_argument("--min_syn", type=int, default=5)
-    p.add_argument("--regions", nargs="+", default=["VIS", "CX", "MB", "OUT"], choices=list(REGION_RULES))
+    p.add_argument("--regions", nargs="+", default=["VIS", "CX", "MB", "OUT"], choices=list(REGION_RULES),
+                   help="VIS CX MB OUT = navigation subcircuit (6,935 neurons); add OTH for the full proofread brain (~139k neurons)")
     a = p.parse_args()
     assert "VIS" in a.regions and "CX" in a.regions, "the student needs VIS (visual input) and CX (action input)"
     print(json.dumps(build(a.ann, a.conn, a.out, a.min_syn, tuple(a.regions)), indent=1))
