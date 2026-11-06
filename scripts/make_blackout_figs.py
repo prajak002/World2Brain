@@ -14,12 +14,13 @@ p = argparse.ArgumentParser(); p.add_argument("--out", default="paper_v2/fig"); 
 p.add_argument("--tn", type=int, default=1, help="arena panel: 1 = continuous-turn (_tn) runs, 0 = clean-turn runs"); p.add_argument("--boot", type=int, default=1000)
 a = p.parse_args(); rng = np.random.default_rng(0)
 NAMES = {"connectome": "connectome", "block_shuffled": "block-shuffled", "degree_shuffled": "degree-shuffled", "random": "random wiring", "dense": "dense",
-         "gru": "GRU (param.-matched)", "gru_budget": "GRU (budget-matched)", "lstm": "LSTM", "transformer": "transformer"}
-COL = {"connectome": "#c0392b", "block_shuffled": "#e67e22", "degree_shuffled": "#f1c40f", "random": "#7f8c8d", "dense": "#8e44ad",
+         "shuffled": "degree-shuffled", "gru": "GRU (param.-matched)", "gru_budget": "GRU (budget-matched)", "lstm": "LSTM", "transformer": "transformer"}
+COL = {"connectome": "#c0392b", "block_shuffled": "#e67e22", "degree_shuffled": "#f1c40f", "random": "#7f8c8d", "shuffled": "#f1c40f", "dense": "#8e44ad",
        "gru": "#2980b9", "gru_budget": "#5dade2", "lstm": "#1abc9c", "transformer": "#27ae60"}
 
 rows = {}   # (env, wiring, readout, k) -> list of per-episode success (pooled over seeds)
 for f in glob.glob("results/homing/*_k*.json"):
+    if "_e100" not in f and os.path.exists(f.replace(".json", "_e100.json")): continue   # a 100-episode rerun supersedes the 50-episode file
     d = json.load(open(f)); m = re.match(r"^(.*)_K1_s(\d+)(_tn)?(_nyc)?$", d["run"])
     if not m: continue
     w = m.group(1); env = d["env"]
@@ -62,7 +63,9 @@ for j, env in enumerate(envs):
     A1.set(xlabel="blackout length k (steps)", ylabel="return success", ylim=(-0.02, 1.02), title=("arena" + (", continuous turns" if a.tn else "")) if env == "arena" else "NYC twin")
     A2.set(xlabel="blackout length k (steps)", ylabel="decoded position drift at end (units)", title=A1.get_title())
     A1.grid(alpha=0.3); A2.grid(alpha=0.3)
-ax1[0, -1].legend(fontsize=7, loc="upper right"); ax2[0, -1].legend(fontsize=7)
+for AX in (ax1, ax2):   # one legend from every panel's handles (a panel may hold only a subset of rows)
+    H = {}; [H.setdefault(l, h) for A in AX[0] for h, l in zip(*A.get_legend_handles_labels())]
+    AX[0, 0].legend(H.values(), H.keys(), fontsize=6.5, loc="lower right")
 if rows2:
     fig3, ax3 = plt.subplots(1, len(envs), figsize=(4.2 * len(envs), 3.4), squeeze=False); ks2 = sorted({k[2] for k in rows2})
     lines += ["", "T2 Continue (goal seen, then k dark steps; success, mean over seeds)", "| world | row | " + " | ".join(f"k={k}" for k in ks2) + " |", "|---|---|" + "---|" * len(ks2)]

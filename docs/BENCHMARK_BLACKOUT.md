@@ -159,3 +159,32 @@ honest venue is a neuro-AI one with the probe result as headline. Known after ~3
 
 Prediction MSE will not be won and the paper should not try (ties block-shuffled within 0.02, loses to GRU by 0.07).
 The sentence is: same predictor, far better memory.
+
+## 12. Lever 1 result: the connectome wins outright (2026-11-06, Mac, policy head)
+
+Protocol as pre-registered (section 5): 12 visible steps, k dark steps, success radius 2 units on the arena (continuous
+turns, TN 0.3, clean-trained checkpoints) and 12 m on the NYC twin, 100 episodes per cell, 95 % bootstrap over
+episodes. Readout: `--readout policy` (two-layer MLP, 256 hidden, behaviour-cloned from oracle actions on 300 of the
+agent's own dark rollouts; identical for every wiring). Files: `results/homing/*_policy_k*.json`,
+table `results/blackout_table.md`, figure `paper_v2/fig/blackout_success.pdf`.
+
+| world | row | k=16 | k=24 | k=30 | k=40 |
+|---|---|---|---|---|---|
+| arena | oracle / dead reckoning / random | 0.98 / 0.88 / 0.00 | 1.00 / 0.90 / 0.02 | 1.00 / 0.90 / 0.02 | 1.00 / 0.90 / 0.04 |
+| arena | **connectome** (s0, s1 pooled) | 0.76 [0.68, 0.84] | **0.69 [0.62, 0.75]** | **0.71 [0.65, 0.78]** | 0.66 [0.56, 0.76] |
+| arena | GRU param-matched (s0) | 0.58 [0.44, 0.72] | 0.45 [0.35, 0.55] | 0.52 [0.42, 0.62] | 0.40 [0.26, 0.54] |
+| arena | dense (s0) | 0.60 [0.46, 0.74] | 0.10 [0.02, 0.18] | 0.00 | 0.08 [0.02, 0.16] |
+| NYC | oracle / dead reckoning / random | | | 1.00 / 1.00 / 0.00 | |
+| NYC | **connectome** (s0) | | | **0.58 [0.48, 0.67]** | |
+| NYC | GRU param-matched (s0) | | | 0.31 [0.22, 0.40] | |
+
+k=24 and k=30 are 100 episodes; k=16 and k=40 are 50 (k=8 is time-limited, oracle 0.16, and is not a memory test).
+Per seed at k=24 / k=30: connectome s0 0.66 / 0.68, s1 0.71 / 0.74; both above the GRU's upper bound. Intervals do
+not overlap at k=24, k=30 (arena) or k=30 (NYC). This is the issue #18 criterion met, on two worlds.
+
+In the paper: section "Benchmark 3b: blind return with a learned policy head", Fig. 5, Table 3; abstract, intro,
+scorecard and conclusion updated; main text cut to the 8-page CVPR limit (secondary floats moved to the supplement).
+
+Still to run (pre-registered, not yet under this readout): block-shuffled and transformer rows (checkpoints on the box
+only), seeds 1-2 for GRU/dense/NYC, NYC k=40 (queued on the Mac), degree-shuffled (queued on the Mac,
+`logs/blackout_mac_queue2.log`). Box command once it is back: `READOUTS="state mlp policy" bash scripts/run_blackout.sh`.
