@@ -1,7 +1,7 @@
 """Memory Maze B4: train one student (PREREG section 3) on teacher-latent prediction with truncated BPTT.
 
 Objective = scripts/train.py unchanged (blind-step-weighted latent MSE under random blackouts + 1e-4 activity penalty,
-AdamW wd 1e-4 at the repo's per-model learning rates, grad clip 1, cosine schedule); windows of --window steps carry the state across the whole 1001-step
+AdamW wd 1e-4 at the repo's per-model learning rates, grad clip 1, linear warmup then cosine); windows of --window steps carry the state across the whole 1001-step
 trajectory (reset only at the trajectory start). The budget is a fixed number of parameter updates (one per window), equal
 for every condition (PREREG Amendment 1). Validation = splits.json 'val' shards; eval trajectories are never loaded here.
 Writes results/memmaze/runs/<cond>_s<seed><tag>.json and checkpoints <name>_u<update>.pt; resumes from <name>_resume.pt.
@@ -17,6 +17,7 @@ p.add_argument("--cond", required=True, choices=["C", "S", "B", "R", "G", "T"]);
 p.add_argument("--data", default="data/mm9"); p.add_argument("--conn", default="data/connectome_full.npz")
 p.add_argument("--updates", type=int, required=True, help="fixed parameter-update budget (PREREG Amendment 1)")
 p.add_argument("--bs", type=int, default=32); p.add_argument("--window", type=int, default=48); p.add_argument("--lr", type=float, default=0, help="0 = repo default per model (scripts/run_l4.sh, selected on validation 2026-11-02): connectome-family 1e-3, GRU 2e-3, transformer 1e-3")
+p.add_argument("--warmup", type=int, default=1000, help="linear lr warmup updates (all conditions)")
 p.add_argument("--H", type=int, default=8, help="blackout length inside a window (train.py default)")
 p.add_argument("--d_model", type=int, default=512, help="transformer width; 512 x 13 layers = C params +0.4 %"); p.add_argument("--eval_every", type=int, default=2500); p.add_argument("--n_val", type=int, default=250)
 p.add_argument("--out", default="results/memmaze/runs"); p.add_argument("--tag", default=""); p.add_argument("--device", default="cuda")
@@ -33,7 +34,9 @@ E, T = tr["act"].shape; print(f"{name}: train traj {E} val traj {len(va['act'])}
 model, info = build(a.cond, load_conn(a.conn), a.seed, a.d_model, a.window); model.to(dev)
 pb = model.param_breakdown(); print("params", pb, info, flush=True)
 opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=1e-4)
-sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, a.updates)
+sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda u: min(1.0, (u + 1) / max(a.warmup, 1)) * 0.5 * (1 + np.cos(np.pi * min(u, a.updates) / a.updates)))
+# linear warmup then cosine, same for every condition: Adam moves all 139k readout weights of the full-brain student in
+# step at the start, so without warmup its output (and loss) jumps by ~N*lr in the first updates (smoke test 2026-11-10)
 is_T = a.cond == "T"
 to = lambda x, i, s: torch.from_numpy(np.ascontiguousarray(x[i][:, s])).to(dev, non_blocking=True)
 
