@@ -28,8 +28,10 @@ def build(cond, conn, seed, d_model=512, ctx=48):
     elif cond == "G":
         h = gru_hidden_for(target, OBS_DIM, Z_DIM, act_dim=ACT_DIM); m = GRUBaseline(OBS_DIM, Z_DIM, h, act_dim=ACT_DIM); info = dict(target_params=target, hidden=h)
     elif cond == "T":
-        L = transformer_layers_for(target, OBS_DIM, Z_DIM, d_model, act_dim=ACT_DIM, max_len=max(64, ctx))
-        m = TransformerWM(OBS_DIM, Z_DIM, d_model, L, n_heads=max(4, d_model // 64), act_dim=ACT_DIM, max_len=max(64, ctx))
+        L0 = transformer_layers_for(target, OBS_DIM, Z_DIM, d_model, act_dim=ACT_DIM, max_len=max(64, ctx))
+        mk = lambda L: TransformerWM(OBS_DIM, Z_DIM, d_model, L, n_heads=max(4, d_model // 64), act_dim=ACT_DIM, max_len=max(64, ctx))
+        L = min((L0, L0 + 1), key=lambda L: abs(mk(L).n_params() - target))   # depth closest to C's count (the floor rule can miss +-5 %)
+        m = mk(L)
         info = dict(target_params=target, d_model=d_model, n_layers=L, ctx=ctx)
     else: raise ValueError(cond)
     if "target_params" in info:   # AGENTS.md rule 3: matched within +-5 %
