@@ -95,6 +95,7 @@ probe = ridge_r2 if a.probe == "ridge" else mlp_r2
 
 
 region = np.tile(conn["region"], args["n_brains"]); ctype = np.tile(conn["cell_type"], args["n_brains"])
+if args["wiring"] == "gnn": region, ctype = np.repeat(region, args["gnn_d"]), np.repeat(ctype, args["gnn_d"])   # #23: d state columns per neuron
 groups = {"all": np.ones(model.N, bool)}
 if args["wiring"] not in ("gru", "lstm", "transformer"):
     groups.update({"CX": region == "CX", "EPG": np.char.startswith(ctype, "EPG"), "VIS": region == "VIS", "MB": region == "MB"})

@@ -198,3 +198,26 @@ def test_lstm_param_matching_state_and_causality():
     x2 = x.clone(); x2[:, 4:] += 1.0; zh2, _ = g(x2, a, v)                      # unidirectional: the past never sees the future
     assert torch.allclose(zh[:, :4], zh2[:, :4]) and not torch.allclose(zh[:, 4:], zh2[:, 4:])
 
+
+
+
+def test_flygnn_reduces_to_flybrain_and_shapes():
+    from wm2cx.student import FlyGNN
+    conn = small_conn(); fb = FlyBrain(conn, 24, 8, seed=3)
+    g = FlyGNN(conn, 24, 8, d=1, update="leaky", phi="identity", seed=3)          # d = 1, identity phi, leaky update = FlyBrain
+    with torch.no_grad():
+        for k in ("dir_in", "dir_act", "dir_vis", "r"): getattr(g, k).fill_(1.0)
+        g.W_raw.copy_(fb.W_raw); g.W_in.load_state_dict(fb.W_in.state_dict()); g.W_act.load_state_dict(fb.W_act.state_dict())
+        g.W_o.load_state_dict(fb.W_out.state_dict()); fb.b.normal_(); fb.gain.uniform_(0.5, 1.5); fb.w_vis.normal_()
+        g.b.copy_(fb.b); g.gain.copy_(fb.gain); g.w_vis.copy_(fb.w_vis)
+    assert torch.equal(g.e_pre, fb.e_pre) and torch.equal(g.e_sign, fb.e_sign)
+    x = torch.randn(2, 6, 24); a = torch.randint(0, 5, (2, 6)); v = torch.ones(2, 6); v[:, 3:5] = 0
+    z1, H1 = fb(x, a, v); z2, H2 = g(x, a, v)
+    assert torch.allclose(H1, H2, atol=1e-5) and torch.allclose(z1, z2, atol=1e-5)
+    for grp in ("cell_type", "region"):
+        m = FlyGNN(conn, 24, 8, d=4, group=grp, seed=0); zh, H = m(x, a, v)
+        assert zh.shape == (2, 6, 8) and H.shape == (2, 6, 4 * fb.N) and m.N == 4 * fb.N and m.param_breakdown()["total"] == m.n_params()
+        zh.pow(2).mean().backward(); assert m.W_raw.grad.abs().sum() > 0 and m.Wi.grad.abs().sum() > 0
+        assert (m.edge_weights().sign() == m.e_sign).all()                         # Dale's law survives
+    x2 = x.clone(); x2[:, 4:] += 1.0; zh2, _ = m(x2, a, v)                         # causal
+    assert torch.allclose(zh[:, :4], zh2[:, :4])

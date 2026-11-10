@@ -308,3 +308,83 @@ class LSTMBaseline(GRUBaseline):
         hn, cn = self.cell(torch.cat(parts, -1), (h[:, :self.hidden], h[:, self.hidden:]))
         return torch.cat([hn, cn], -1)
 
+
+
+
+class FlyGNN(nn.Module):
+    """Graph-network student on the connectome's edge list (#23): the same graph as FlyBrain, but every neuron carries a
+    d-dimensional state, so the real wiring gets vector capacity without changing who talks to whom.
+
+      message   m_ij = s_ij * softplus(w_ij) * phi_g(j)(h_j)     one trainable scalar per real edge, fixed sign (Dale)
+      aggregate a_i  = sum_j m_ij                                 index_add over the edge list, O(E d)
+      update    h_i <- GRU_g(i)(a_i + input_i, h_i)               (update="gru"), or the FlyBrain leaky tanh (update="leaky")
+      readout   z_hat = W_o (r_g(i) . h_i)                        one scalar per neuron, then the usual N -> z linear map
+
+    g(i) is the neuron's group: its cell type (group="cell_type") or its region (group="region"); phi, the GRU cell, the
+    readout vector r and the input directions are shared inside a group, which is what keeps the parameter count at the
+    FlyBrain budget. Input enters as in FlyBrain (visual drive on VIS neurons, action on CX and OUT, blackout flag on all),
+    each a scalar per neuron spread over the d channels by a group direction. phi is one linear map + tanh per *pre* group
+    (the issue asks for one per (pre type, post type) pair: with 796 cell types that is 634 k pairs, far over budget).
+    The state handed to callers is flat, [B, n_neurons * d], neuron-major (neuron i owns columns i*d .. i*d+d-1).
+    With d = 1, update="leaky", phi="identity" and unit directions it is FlyBrain exactly (tested)."""
+    def __init__(self, conn, obs_dim, z_dim, act_dim=5, wiring="connectome", d=8, group="cell_type", update="gru", phi="mlp",
+                 alpha=0.5, seed=0, vis_flag=True):
+        super().__init__()
+        n, post, pre, sign = build_edges(conn, wiring, 1, seed)
+        self.n_neurons = n; self.d = d; self.N = n * d; self.act_dim = act_dim; self.wiring = "gnn"; self.graph = wiring
+        self.update = update; self.phi = phi; self.alpha = alpha; self.dense = False; self.n_edges = len(post)
+        region = conn["region"]; _, gid = np.unique(conn["cell_type"] if group == "cell_type" else region, return_inverse=True)
+        self.G = G = int(gid.max()) + 1
+        vis_idx = np.nonzero(region == "VIS")[0]; nv = len(vis_idx)
+        self.register_buffer("grp", torch.from_numpy(gid.astype(np.int64)))
+        self.register_buffer("vis_idx", torch.from_numpy(vis_idx.astype(np.int64)))
+        self.register_buffer("act_mask", torch.from_numpy(np.isin(region, ["CX", "OUT"]).astype(np.float32)))
+        self.register_buffer("e_post", torch.from_numpy(post)); self.register_buffer("e_pre", torch.from_numpy(pre))
+        self.register_buffer("e_sign", torch.from_numpy(sign))
+        g = torch.Generator().manual_seed(seed); rn = lambda *s: torch.randn(*s, generator=g)
+        indeg = torch.bincount(self.e_post, minlength=n).clamp(min=1).float()
+        self.W_raw = nn.Parameter((rn(len(post)) / indeg[self.e_post].sqrt()).abs())
+        self.W_in = nn.Linear(obs_dim, nv); self.W_act = nn.Linear(act_dim, n, bias=False)
+        self.w_vis = nn.Parameter(torch.zeros(n)) if vis_flag else None
+        self.dir_in = nn.Parameter(rn(G, d)); self.dir_act = nn.Parameter(rn(G, d)); self.dir_vis = nn.Parameter(rn(G, d))
+        self.r = nn.Parameter(rn(G, d) / d ** 0.5); self.W_o = nn.Linear(n, z_dim)
+        if phi == "mlp": self.phi_W = nn.Parameter(torch.eye(d).repeat(G, 1, 1) + 0.1 * rn(G, d, d)); self.phi_b = nn.Parameter(torch.zeros(G, d))
+        if update == "gru":
+            self.Wi = nn.Parameter(rn(G, d, 3 * d) / d ** 0.5); self.Wh = nn.Parameter(rn(G, d, 3 * d) / d ** 0.5)
+            self.bi = nn.Parameter(torch.zeros(G, 3 * d)); self.bh = nn.Parameter(torch.zeros(G, 3 * d))
+        else: self.b = nn.Parameter(torch.zeros(n)); self.gain = nn.Parameter(torch.ones(n))
+
+    def n_params(self): return sum(p.numel() for p in self.parameters())
+    def param_breakdown(self):
+        rec = self.W_raw.numel(); inp = sum(p.numel() for p in self.W_in.parameters()) + self.W_act.weight.numel()
+        out = sum(p.numel() for p in self.W_o.parameters()) + self.r.numel()
+        return dict(recurrent=rec, input=inp, output=out, other=self.n_params() - rec - inp - out, total=self.n_params(), edges=self.n_edges)
+    def flops_per_step(self, obs_dim=None):
+        n, d = self.n_neurons, self.d; upd = 6 * n * d * d if self.update == "gru" else n * d
+        return 2 * (self.n_edges * d + (n * d * d if self.phi == "mlp" else 0) + upd + self.W_in.in_features * len(self.vis_idx)
+                    + self.act_dim * n + n * d + n * self.W_o.out_features)
+    def edge_weights(self): return F.softplus(self.W_raw) * self.e_sign
+    weights = edge_weights
+    def init_state(self, B, device): return torch.zeros(B, self.N, device=device)
+    def W_out(self, H): return self.W_o((H.view(*H.shape[:-1], self.n_neurons, self.d) * self.r[self.grp]).sum(-1))
+
+    def step(self, h, obs, act, visible, W=None):
+        w = self.edge_weights() if W is None else W; B = h.shape[0]; h = h.view(B, self.n_neurons, self.d)
+        m = torch.tanh(torch.einsum("bnd,nde->bne", h, self.phi_W[self.grp]) + self.phi_b[self.grp]) if self.phi == "mlp" else h
+        x = torch.zeros_like(h).index_add_(1, self.e_post, m[:, self.e_pre] * w[:, None])
+        s_in = torch.zeros(B, self.n_neurons, device=h.device, dtype=h.dtype).index_add_(1, self.vis_idx, self.W_in(obs) * visible[:, None])
+        x = x + s_in[..., None] * self.dir_in[self.grp] + (self.W_act(F.one_hot(act, self.act_dim).float()) * self.act_mask)[..., None] * self.dir_act[self.grp]
+        if self.w_vis is not None: x = x + (self.w_vis * (1 - visible)[:, None])[..., None] * self.dir_vis[self.grp]
+        if self.update == "gru":
+            gi = torch.einsum("bnd,nde->bne", x, self.Wi[self.grp]) + self.bi[self.grp]
+            gh = torch.einsum("bnd,nde->bne", h, self.Wh[self.grp]) + self.bh[self.grp]
+            ir, iz, inn = gi.chunk(3, -1); hr, hz, hn = gh.chunk(3, -1)
+            r, z = torch.sigmoid(ir + hr), torch.sigmoid(iz + hz); out = (1 - z) * torch.tanh(inn + r * hn) + z * h
+        else: out = (1 - self.alpha) * h + self.alpha * torch.tanh(self.gain[:, None] * (x + self.b[:, None]))
+        return out.reshape(B, self.N)
+
+    def forward(self, obs, act, visible, h=None):
+        B, T, _ = obs.shape; w = self.edge_weights(); h = self.init_state(B, obs.device) if h is None else h; hs = []
+        for t in range(T):
+            h = self.step(h, obs[:, t], act[:, t - 1] if t > 0 else torch.zeros_like(act[:, 0]), visible[:, t], w); hs.append(h)
+        H = torch.stack(hs, 1); return self.W_out(H), H

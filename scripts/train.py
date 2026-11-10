@@ -1,13 +1,16 @@
 import argparse, json, time, numpy as np, torch, os
 from wm2cx.aux_losses import dead_reckoning_loss, blackout_contrastive_loss
-from wm2cx.student import FlyBrain, GRUBaseline, LSTMBaseline, gru_hidden_for, lstm_hidden_for, WIRINGS
+from wm2cx.student import FlyBrain, FlyGNN, GRUBaseline, LSTMBaseline, gru_hidden_for, lstm_hidden_for, WIRINGS
 from wm2cx.transformer import TransformerWM, transformer_layers_for
 from wm2cx.data import load_split, blackout, parse_windows, window_errors
 from wm2cx.connectome import load as load_conn
 
 p = argparse.ArgumentParser()
-p.add_argument("--wiring", default="connectome", choices=WIRINGS + ("gru", "lstm", "transformer")); p.add_argument("--n_brains", type=int, default=1)
+p.add_argument("--wiring", default="connectome", choices=WIRINGS + ("gru", "lstm", "transformer", "gnn")); p.add_argument("--n_brains", type=int, default=1)
 p.add_argument("--d_model", type=int, default=256, help="transformer baseline width")
+p.add_argument("--gnn_graph", default="connectome", choices=["connectome", "block_shuffled", "shuffled", "random"], help="#23: graph the GNN student runs on (--wiring gnn)")
+p.add_argument("--gnn_d", type=int, default=8, help="#23: state channels per neuron"); p.add_argument("--gnn_group", default="region", choices=["cell_type", "region"], help="#23: sharing unit for phi / update / readout")
+p.add_argument("--gnn_update", default="gru", choices=["gru", "leaky"]); p.add_argument("--gnn_phi", default="mlp", choices=["mlp", "identity"])
 p.add_argument("--n_layers", type=int, default=0, help="transformer baseline depth; 0 = deepest model at --d_model with <= the FlyBrain parameter count of this config")
 p.add_argument("--in_mode", default="linear", choices=["linear", "attn"], help="attn: cross-attention input encoder instead of the linear W_in (GRU / transformer budgets follow)")
 p.add_argument("--hybrid", type=int, default=0, help="connectome recurrence plus one shared attention layer over cell-type-pooled activity per step (ablation)")
@@ -45,7 +48,7 @@ if a.val > 0:  # validation split carved from the training episodes (fixed by se
 E, T = tr["obs"].shape[:2]; windows = parse_windows(a.eval_windows, T); obs_dim = tr["obs"].shape[-1]
 print(f"train eps {E} val eps {0 if va is None else len(va['obs'])} test eps {len(te['obs'])} PCA{a.k} explained {lat.explained:.3f}")
 conn = load_conn(a.conn)
-fly = FlyBrain(conn, obs_dim, a.k, wiring=a.wiring if a.wiring not in ("gru", "lstm", "transformer") else "connectome", n_brains=a.n_brains, seed=a.seed, vis_flag=bool(a.vis_flag), in_rank=a.in_rank,
+fly = FlyBrain(conn, obs_dim, a.k, wiring=a.wiring if a.wiring not in ("gru", "lstm", "transformer", "gnn") else "connectome", n_brains=a.n_brains, seed=a.seed, vis_flag=bool(a.vis_flag), in_rank=a.in_rank,
                learn_alpha=bool(a.learn_alpha), gate=bool(a.gate), in_mode=a.in_mode, hybrid=bool(a.hybrid))
 if a.wiring == "gru":
     if a.gru_hidden <= 0: a.gru_hidden = gru_hidden_for(fly.n_params(), obs_dim, a.k, vis_flag=bool(a.vis_flag))
@@ -53,6 +56,10 @@ if a.wiring == "gru":
 elif a.wiring == "lstm":   # #24: unidirectional LSTM at the same parameter budget; --gru_hidden holds its hidden size
     if a.gru_hidden <= 0: a.gru_hidden = lstm_hidden_for(fly.n_params(), obs_dim, a.k, vis_flag=bool(a.vis_flag))
     model = LSTMBaseline(obs_dim, a.k, a.gru_hidden, vis_flag=bool(a.vis_flag)); del fly
+elif a.wiring == "gnn":   # #23: vector state on the same edge list; must stay within +-5 % of the FlyBrain parameter count (AGENTS.md rule 3)
+    assert a.n_brains == 1
+    model = FlyGNN(conn, obs_dim, a.k, wiring=a.gnn_graph, d=a.gnn_d, group=a.gnn_group, update=a.gnn_update, phi=a.gnn_phi, seed=a.seed, vis_flag=bool(a.vis_flag))
+    ratio = model.n_params() / fly.n_params(); print(f"gnn params / FlyBrain params = {ratio:.4f}"); assert abs(ratio - 1) <= 0.05, ratio; del fly
 elif a.wiring == "transformer":
     if a.n_layers <= 0: a.n_layers = transformer_layers_for(fly.n_params(), obs_dim, a.k, a.d_model, vis_flag=bool(a.vis_flag))
     model = TransformerWM(obs_dim, a.k, a.d_model, a.n_layers, vis_flag=bool(a.vis_flag)); del fly
@@ -63,7 +70,8 @@ act_head = torch.nn.Linear(model.N, model.act_dim).to(dev) if a.lambda_act > 0 e
 dr_head = con_head = None
 if a.lambda_dr > 0:   # #21: read the central complex only (region labels are kept by every rewiring control); free baselines read every unit
     is_graph = a.wiring not in ("gru", "lstm", "transformer")
-    dr_idx = torch.from_numpy(np.nonzero(np.tile(conn["region"], a.n_brains) == "CX")[0] if is_graph else np.arange(model.N)).to(dev)
+    reg = np.repeat(conn["region"], a.gnn_d) if a.wiring == "gnn" else np.tile(conn["region"], a.n_brains)   # gnn state is neuron-major
+    dr_idx = torch.from_numpy(np.nonzero(reg == "CX")[0] if is_graph else np.arange(model.N)).to(dev)
     dr_head = torch.nn.Linear(len(dr_idx), 2).to(dev)
 if a.lambda_con > 0: con_head = torch.nn.Linear(model.N, a.k).to(dev)
 params = list(model.parameters()) + [q for hd in (act_head, dr_head, con_head) if hd is not None for q in hd.parameters()]
