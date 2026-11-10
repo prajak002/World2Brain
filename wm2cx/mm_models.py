@@ -18,7 +18,7 @@ COND_WIRING = {"C": "connectome", "S": "shuffled", "B": "block_shuffled", "R": "
 OBS_DIM, Z_DIM, ACT_DIM = 768, 256, 6
 
 
-def build(cond, conn, seed, d_model=768, ctx=48):
+def build(cond, conn, seed, d_model=512, ctx=48):
     """-> (model, info). Every model is built from the same C reference so parameter matching is exact and logged."""
     ref = None
     if cond in ("G", "T"):
@@ -32,6 +32,8 @@ def build(cond, conn, seed, d_model=768, ctx=48):
         m = TransformerWM(OBS_DIM, Z_DIM, d_model, L, n_heads=max(4, d_model // 64), act_dim=ACT_DIM, max_len=max(64, ctx))
         info = dict(target_params=target, d_model=d_model, n_layers=L, ctx=ctx)
     else: raise ValueError(cond)
+    if "target_params" in info:   # AGENTS.md rule 3: matched within +-5 %
+        info["param_ratio"] = m.n_params() / info["target_params"]; assert abs(info["param_ratio"] - 1) <= 0.05, info
     return m, info
 
 

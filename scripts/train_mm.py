@@ -1,7 +1,7 @@
 """Memory Maze B4: train one student (PREREG section 3) on teacher-latent prediction with truncated BPTT.
 
 Objective = scripts/train.py unchanged (blind-step-weighted latent MSE under random blackouts + 1e-4 activity penalty,
-AdamW lr 2e-3 wd 1e-4, grad clip 1, cosine schedule); windows of --window steps carry the state across the whole 1001-step
+AdamW wd 1e-4 at the repo's per-model learning rates, grad clip 1, cosine schedule); windows of --window steps carry the state across the whole 1001-step
 trajectory (reset only at the trajectory start). The budget is a fixed number of parameter updates (one per window), equal
 for every condition (PREREG Amendment 1). Validation = splits.json 'val' shards; eval trajectories are never loaded here.
 Writes results/memmaze/runs/<cond>_s<seed><tag>.json and checkpoints <name>_u<update>.pt; resumes from <name>_resume.pt.
@@ -16,12 +16,13 @@ p = argparse.ArgumentParser()
 p.add_argument("--cond", required=True, choices=["C", "S", "B", "R", "G", "T"]); p.add_argument("--seed", type=int, default=0)
 p.add_argument("--data", default="data/mm9"); p.add_argument("--conn", default="data/connectome_full.npz")
 p.add_argument("--updates", type=int, required=True, help="fixed parameter-update budget (PREREG Amendment 1)")
-p.add_argument("--bs", type=int, default=32); p.add_argument("--window", type=int, default=48); p.add_argument("--lr", type=float, default=2e-3)
+p.add_argument("--bs", type=int, default=32); p.add_argument("--window", type=int, default=48); p.add_argument("--lr", type=float, default=0, help="0 = repo default per model (scripts/run_l4.sh, selected on validation 2026-11-02): connectome-family 1e-3, GRU 2e-3, transformer 1e-3")
 p.add_argument("--H", type=int, default=8, help="blackout length inside a window (train.py default)")
-p.add_argument("--d_model", type=int, default=768); p.add_argument("--eval_every", type=int, default=2500); p.add_argument("--n_val", type=int, default=250)
+p.add_argument("--d_model", type=int, default=512, help="transformer width; 512 x 13 layers = C params +0.4 %"); p.add_argument("--eval_every", type=int, default=2500); p.add_argument("--n_val", type=int, default=250)
 p.add_argument("--out", default="results/memmaze/runs"); p.add_argument("--tag", default=""); p.add_argument("--device", default="cuda")
 p.add_argument("--n_train", type=int, default=0, help="smoke tests only: first N training trajectories")
 a = p.parse_args()
+if not a.lr: a.lr = 2e-3 if a.cond == "G" else 1e-3
 name = f"{a.cond}_s{a.seed}{a.tag}"; os.makedirs(a.out, exist_ok=True); J = f"{a.out}/{name}.json"
 if os.path.exists(J): print("done already:", J); raise SystemExit
 torch.manual_seed(a.seed); dev = a.device; torch.backends.cuda.matmul.allow_tf32 = True
