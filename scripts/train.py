@@ -1,4 +1,5 @@
 import argparse, json, time, numpy as np, torch, os
+from wm2cx.aux_losses import dead_reckoning_loss, blackout_contrastive_loss
 from wm2cx.student import FlyBrain, GRUBaseline, LSTMBaseline, gru_hidden_for, lstm_hidden_for, WIRINGS
 from wm2cx.transformer import TransformerWM, transformer_layers_for
 from wm2cx.data import load_split, blackout, parse_windows, window_errors
@@ -24,6 +25,8 @@ p.add_argument("--test", nargs="+", default=["data/nav_test.npz", "data/arrange_
 p.add_argument("--conn", default="data/connectome.npz"); p.add_argument("--tag", default="")
 p.add_argument("--eval_windows", nargs="+", default=["8:16", "14:22"], help="blind windows t0:t1 evaluated on test; the first is primary (#8)")
 p.add_argument("--lambda_act", type=float, default=0.0, help="weight of the optional policy-imitation loss (predict the next action from h); 0 = prediction-only (#12)")
+p.add_argument("--lambda_dr", type=float, default=0.0, help="#21: weight of the dead-reckoning loss (CX neurons -> egocentric displacement during blind steps); 0 = off")
+p.add_argument("--lambda_con", type=float, default=0.0, help="#21: weight of the across-blackout contrastive loss; 0 = off")
 p.add_argument("--n_train", type=int, default=0, help="data-efficiency axis: train on a random subset of this many episodes (seeded, stratified over the train files); 0 = all. PCA stays fit on the full train set so targets are comparable across n_train.")
 a = p.parse_args()
 torch.manual_seed(a.seed); rng = np.random.default_rng(a.seed); dev = a.device
@@ -57,7 +60,13 @@ else:
     model = fly
 model.to(dev); pb = model.param_breakdown(); print("neurons", model.N, "params", pb)
 act_head = torch.nn.Linear(model.N, model.act_dim).to(dev) if a.lambda_act > 0 else None
-params = list(model.parameters()) + (list(act_head.parameters()) if act_head is not None else [])
+dr_head = con_head = None
+if a.lambda_dr > 0:   # #21: read the central complex only (region labels are kept by every rewiring control); free baselines read every unit
+    is_graph = a.wiring not in ("gru", "lstm", "transformer")
+    dr_idx = torch.from_numpy(np.nonzero(np.tile(conn["region"], a.n_brains) == "CX")[0] if is_graph else np.arange(model.N)).to(dev)
+    dr_head = torch.nn.Linear(len(dr_idx), 2).to(dev)
+if a.lambda_con > 0: con_head = torch.nn.Linear(model.N, a.k).to(dev)
+params = list(model.parameters()) + [q for hd in (act_head, dr_head, con_head) if hd is not None for q in hd.parameters()]
 opt = torch.optim.AdamW(params, lr=a.lr, weight_decay=1e-4)
 sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, a.epochs)
 
@@ -94,6 +103,8 @@ for ep in range(a.epochs):
         loss = (((zh - z) ** 2).mean(-1) * w).mean() + 1e-4 * (Hs ** 2).mean()
         if act_head is not None:   # policy imitation: h_t -> action taken after step t (act[:, t])
             loss = loss + a.lambda_act * torch.nn.functional.cross_entropy(act_head(Hs).flatten(0, 1), act.flatten())
+        if dr_head is not None: loss = loss + a.lambda_dr * dead_reckoning_loss(dr_head(Hs[..., dr_idx]), tr["pos"][idx].to(dev), tr["heading"][idx].to(dev), vis)
+        if con_head is not None: loss = loss + a.lambda_con * blackout_contrastive_loss(con_head(Hs), z, vis)
         opt.zero_grad(); loss.backward(); torch.nn.utils.clip_grad_norm_(params, 1.0); opt.step()
         tot += loss.item(); n += 1
     sched.step()
