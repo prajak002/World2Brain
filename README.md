@@ -4,6 +4,9 @@ Distilling a video world model (V-JEPA 2.1, ViT-B) into a recurrent student whos
 the FlyWire v783 Drosophila connectome (6,935 neurons across visual projection, central complex, mushroom-body
 output and descending populations). See `PAPER_PLAN.md` for the claim, controls and experiment design.
 
+**Running GPU experiments (people or coding agents):** start with `AGENTS.md`, then `docs/PREREG.md` (frozen
+hypotheses and statistics) and `docs/RUNBOOK_GPU.md` (batch queue: full brain on the H200, Memory Maze offline probing).
+
 **Continuing on another machine (M1):** read `docs/HANDOFF_M1.md` first. It lists where every file lives (git, Kaggle),
 what each result means, and how to rerun the figures, videos and probes with `--device mps`. The CVPR-format paper is in
 `paper/`; the two explainer videos are `results/video/wm2cx_paper.mp4` (arena) and `results/video/wm2cx_realvid.mp4`
