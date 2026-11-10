@@ -127,3 +127,38 @@ Measurements: `results/memmaze/b0_bench.json`; smoke logs `logs/smoke_*.log` on 
    agent-centric object vector averaged over the 3 objects, both averaged over steps 500-1000.
 10. **Order and cuts.** Wave order C s0-4 and G s0-4 first, then S, B, R s0-2, then T s0-2. If the deadline forces a
    cut, whole conditions are cut in reverse order (T, then R), never seeds of a condition (section 6).
+
+### Amendment 2 — 2026-11-10, before any B4 run (no trained Memory Maze checkpoint exists yet)
+Adds one secondary analysis, the **in-silico lesion test**, and its hypotheses H7. It adds no training run and changes
+nothing in sections 1-7 or Amendment 1; H1-H6 and their Holm family are untouched. H7 has its own Holm family.
+
+1. **Question.** Does the trained whole-brain student use the fly's anatomical circuits the way the fly does? The
+   Objects task asks for the agent-centred vector to objects seen earlier, which must be updated as the agent turns and
+   moves; in the fly this vector/heading computation is attributed to the central complex (CX). The mushroom body (MB)
+   is the fly's associative-memory centre and serves as the anatomical comparison region.
+2. **Lesion.** For a trained checkpoint and its already-trained, frozen probe pair, the state of a set of neurons is set
+   to 0 after every step from t = 0 (they send nothing through the recurrent edges; the probe reads 0 from them). No
+   retraining of student or probe. Code: `scripts/eval_mm_lesion.py`, groups in `wm2cx.mm_models.lesion_groups`:
+   CX = FlyWire cell_class CX; MB = MBON + DAN + Kenyon cells (cell_type KC*); OUT = descending neurons.
+3. **Controls.** (a) 10 random lesions per group, drawn from neurons that receive no direct input, matched to the group
+   in neuron count and out-degree deciles (seeded by model seed and draw index); (b) the same lesions, same neuron
+   indices, in the degree-shuffled student S (labels kept, wiring identity destroyed) and the block-shuffled student B;
+   (c) "CXdeaf": CX neurons intact but their direct action input removed, because in this student the action enters
+   through CX and descending neurons, so a CX lesion also removes input; (d) OUT lesion (the other action-recipient
+   group). (c) and (d) are descriptive.
+4. **Measure.** Deficit D(L, m) per eval trajectory = score lost under lesion L on metric m (steps 500-1000), divided by
+   the condition's intact gap to the constant predictor K ("fraction of the above-constant performance lost").
+   Specific effect E(L, m) = D(L, m) - mean D over the 10 matched random lesions.
+5. **Hypotheses (directional).** **H7a:** E_C(CX, Objects) > 0. **H7b:** E_C(CX, Objects) > E_C(MB, Objects).
+   **H7c (wiring specificity):** E_C(CX, Objects) > E_S(CX, Objects). Statistics as section 5 (bootstrap over the 1,000
+   eval trajectories, 10,000 resamples, model seeds resampled within condition; 5 C seeds, 3 S seeds), Holm over
+   {H7a, H7b, H7c} at alpha 0.05 (`scripts/mm_lesion_stats.py`). All other cells (Walls, MB, B, CXdeaf, OUT) are
+   reported descriptively with 95 % CIs; no double dissociation is claimed unless the table shows it.
+6. **Preconditions and limits, stated now.** H7 is interpreted only if H4 passes (C holds memory beyond the teacher's
+   features); otherwise it is reported as void. The probe was trained on intact states, so any lesion also removes the
+   probe's direct read of those neurons: this is why every claim is relative to matched random lesions. If the CXdeaf
+   deficit is as large as the CX lesion deficit, the CX effect is attributed to lost action input, not to the circuit,
+   and the paper says so.
+7. **Claim allowed.** H7a + H7c pass: "silencing the central complex of the distilled whole-brain student impairs
+   object-vector memory more than matched random lesions, and only with the real wiring". Otherwise the lesion table is
+   reported as a negative.
