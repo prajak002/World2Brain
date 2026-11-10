@@ -7,11 +7,16 @@
 # Restartable: every stage skips work whose output exists.
 #
 #   cd ~/World2Brain && STAGES="graph arena tn nyc hd homing blackout" nohup bash scripts/run_l4_full.sh > logs/l4_full_$(date +%F).log 2>&1 &
+# Big GPU (H200 141 GB / H100 80 GB): JOBS=N trains N runs at once (one full-brain run needs ~14 GB), each into
+# logs/train_<run>.log; P=N parallelises the blackout evals. Same protocol and batch size, so results stay comparable.
+#   JOBS=6 P=6 OMP=8 STAGES="arena tn nyc hd homing blackout" nohup bash scripts/run_l4_full.sh > logs/h200_full_$(date +%F).log 2>&1 &
 set -uo pipefail
 cd "$(dirname "$0")/.."; mkdir -p logs results/runs results/hd results/homing
 STAGES=${STAGES:-"graph arena tn nyc hd homing blackout"}
-export PYTHONPATH=. DEVICE=${DEVICE:-cuda} PY=${PY:-/opt/pytorch/bin/python} TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
-export OMP_NUM_THREADS=4 OPENBLAS_NUM_THREADS=4 MKL_NUM_THREADS=4
+[ -x /opt/pytorch/bin/python ] && DEF_PY=/opt/pytorch/bin/python || DEF_PY="uv run --no-sync python"   # AWS DLAMI venv, else the project's uv env
+export PYTHONPATH=. DEVICE=${DEVICE:-cuda} PY=${PY:-$DEF_PY} TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1
+OMP=${OMP:-4}; export OMP_NUM_THREADS=$OMP OPENBLAS_NUM_THREADS=$OMP MKL_NUM_THREADS=$OMP
+JOBS=${JOBS:-1}; P=${P:-2}
 stage() { case " $STAGES " in *" $1 "*) echo; echo "##### $1  $(date +%T)"; return 0;; *) return 1;; esac; }
 SEEDS=${SEEDS:-"0 1 2"}; EPOCHS=${EPOCHS:-20}; TN=${TN:-0.3}; BS=${BS:-16}
 LR_CONN=${LR_CONN:-1e-3}; LR_GRU=${LR_GRU:-2e-3}; LR_TF=${LR_TF:-1e-3}
@@ -27,7 +32,18 @@ TND="--train data/nav_tn_train.npz data/arrange_tn_train.npz --test data/nav_tn_
 NYD="--train data/nyc_twin_train.npz --test data/nyc_twin_test.npz"
 
 done_run() { [ -f "results/runs/$1.json" ] && grep -q test_mse_per_ep "results/runs/$1.json"; }
-T() { local name=$1; shift; if done_run "$name"; then echo "skip $name"; else echo "=== $name  $(date +%T)"; $PY scripts/train.py --device "$DEVICE" --epochs "$EPOCHS" --bs $BS --conn $CONN "$@" 2>&1 | grep -v -i -E "warn|redirect|AttentionInterface|pynvml"; fi; }
+T() {
+  local name=$1; shift
+  if done_run "$name"; then echo "skip $name"; return 0; fi
+  if [ "$JOBS" -le 1 ]; then
+    echo "=== $name  $(date +%T)"; $PY scripts/train.py --device "$DEVICE" --epochs "$EPOCHS" --bs $BS --conn $CONN "$@" 2>&1 | grep -v -i -E "warn|redirect|AttentionInterface|pynvml"
+    return 0
+  fi
+  while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n 2>/dev/null || sleep 5; done   # at most JOBS trainings on the GPU at once
+  echo "=== $name  $(date +%T)  (bg, logs/train_$name.log)"
+  ( if $PY scripts/train.py --device "$DEVICE" --epochs "$EPOCHS" --bs $BS --conn $CONN "$@" > "logs/train_$name.log" 2>&1 && done_run "$name"
+    then echo "done $name  $(date +%T)"; else echo "FAILED $name  $(date +%T)  (see logs/train_$name.log)"; fi ) &
+}
 train_set() {   # $1 = tag suffix ("" | _tn | _nyc), $2.. = data args
   local sfx=$1; shift
   for s in $SEEDS; do
@@ -39,6 +55,7 @@ train_set() {   # $1 = tag suffix ("" | _tn | _nyc), $2.. = data args
 stage arena && train_set ""    $AR
 stage tn    && [ -f data/nav_tn_train.npz ]   && train_set _tn  $TND
 stage nyc   && [ -f data/nyc_twin_train.npz ] && train_set _nyc --epochs 30 $NYD
+wait   # background trainings (JOBS > 1) must finish before the evals read their checkpoints
 
 if stage hd; then
   GH=$($PY -c "import json; print(json.load(open('results/runs/gru_K1_s0_full.json'))['args']['gru_hidden'])" 2>/dev/null || echo 3600)
@@ -60,5 +77,5 @@ if stage homing; then     # linear-readout homing, as in run_l4.sh, for the homi
 fi
 
 # Blackout Navigation benchmark (docs/BENCHMARK_BLACKOUT.md) with the policy head on the full-brain checkpoints
-stage blackout && SFX=_full WIRINGS="$WIRINGS gru transformer" READOUTS="policy state" SEEDS="$SEEDS" DEVICE=$DEVICE PY=$PY bash scripts/run_blackout.sh
+stage blackout && P=$P SFX=_full WIRINGS="$WIRINGS gru transformer" READOUTS="policy state" SEEDS="$SEEDS" DEVICE=$DEVICE PY=$PY bash scripts/run_blackout.sh
 echo; echo "FULL-BRAIN STAGES DONE $(date +%T)"
