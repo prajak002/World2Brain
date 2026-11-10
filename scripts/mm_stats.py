@@ -46,8 +46,10 @@ for t in tests:
     if t.get("missing"): t["verdict"] = "NOT RUN"; continue
     t["verdict"] = "PASS" if (t["p_holm"] < 0.05 and t["ci"][0] > 0) else ("FAIL" if t["ci"][1] < 0 else "INCONCLUSIVE")
 verdict = {t["h"]: t["verdict"] for t in tests}
-H = {"H1": verdict["H1"], "H2": "PASS" if verdict["H2a"] == verdict["H2b"] == "PASS" else ("FAIL" if "FAIL" in (verdict["H2a"], verdict["H2b"]) else "INCONCLUSIVE"),
-     "H3": verdict["H3"], "H4": "PASS" if verdict["H4a"] == verdict["H4b"] == "PASS" else ("FAIL" if "FAIL" in (verdict["H4a"], verdict["H4b"]) else "INCONCLUSIVE")}
+def combine(*v):
+    if "NOT RUN" in v: return "NOT RUN"
+    return "PASS" if all(x == "PASS" for x in v) else ("FAIL" if "FAIL" in v else "INCONCLUSIVE")
+H = {"H1": verdict["H1"], "H2": combine(verdict["H2a"], verdict["H2b"]), "H3": verdict["H3"], "H4": combine(verdict["H4a"], verdict["H4b"])}
 if "C" in S: c_obj = float(S["C"]["objects"].mean()); H["H5"] = f"descriptive: C objects MSE {c_obj:.2f} vs published RSSM (TBTT) 6.2 -> {'below' if c_obj < 6.2 else 'not below'}"
 L = ["# Memory Maze 9x9 offline probing (PREREG sections 2-5)", "", "| condition | seeds | 9x9 Walls acc % | 9x9 Objects MSE |", "|---|---|---|---|"]
 for c in ["C", "S", "B", "R", "G", "T", "N", "K"]:
