@@ -82,47 +82,4 @@ a publishable negative and is reported as such.
 * Only H5 descriptive placement against published rows; never "state of the art".
 
 ## Amendments
-
-### Amendment 1 — 2026-11-10, before any B3/B4 run (RUNBOOK B0)
-Written after the B0 throughput measurements and the smoke tests on training data only (no eval trajectory has been used
-by any model; the constant predictor K, which has no parameters to tune, was scored on eval once as the metric check).
-Measurements: `results/memmaze/b0_bench.json`; smoke logs `logs/smoke_*.log` on the H200 box.
-
-1. **Training pool.** The 9x9 release could only be partly downloaded: Google Drive's per-file quota blocks
-   `train-part4`..`part9` (retried hourly). The pool is fixed now as **download parts 0-3 = 11,600 trajectories**:
-   train = the first 10,600, validation = the last 1,000 (PREREG section 3 rule applied to this pool); eval = all
-   1,000 released eval trajectories. Parts that arrive later are **not** added to any headline condition.
-2. **Teacher input.** V-JEPA 2.1 ViT-B, causal 8-frame window ending at step t (frame 0 repeated before the start),
-   each frame duplicated so one tubelet = one step (as `scripts/collect.py --causal 1`); 64x64 frames upsampled
-   bilinearly to **128x128** (not the paper's 256: 1,370 vs 350 clips/s on the H200, i.e. ~2.5 h instead of ~10 h for
-   the pool); **bf16 autocast**. Latent = mean token + 2x2 pooled tokens (3,840), PCA-256 fit on the 10,600 train
-   trajectories only, whitened as `wm2cx.data.Latents`.
-3. **Student input.** Frame mean-pooled to 16x16x3 (768 values, the same size as the paper's 32x8 fly eye), the
-   previous action (6, one-hot), the visible flag. The student never sees agent_pos/agent_dir.
-4. **Conditions as built** (`wm2cx/mm_models.py`): C/S/B/R = FlyBrain on the full brain (139,248 neurons,
-   2,700,429 edges), 41,393,175 parameters; G = GRU hidden 3,308, 41,386,644 (-0.02 %); T = causal transformer width
-   512, 13 layers, 41,543,424 (+0.36 %), context = 48 steps; N = probe on the teacher's PCA-256 latent at step t
-   (this latent covers frames t-7..t, i.e. 2 s, the teacher's own window, not a single frame); K = train means.
-5. **Optimisation (identical objective for every condition).** `scripts/train.py` loss unchanged (blind-step-weighted
-   latent MSE under random 8-step blackouts in 70 % of windows + 1e-4 activity penalty); TBTT windows of 48 steps,
-   state carried across the 1,001-step trajectory and reset only at its start; batch 32 trajectories; AdamW wd 1e-4,
-   grad clip 1; learning rates = the repo's validated defaults (`scripts/run_l4.sh`): C/S/B/R/T 1e-3, G 2e-3; **linear
-   warmup of 1,000 updates** then cosine decay, for every condition (added after the smoke test: without it the
-   full-brain readout's loss jumps to 10-100x the GRU's in the first 100 updates). No further hyper-parameter search
-   (deadline); validation is used only for the checkpoint rule.
-6. **Budget.** **U = {U} parameter updates per condition** (one update per 48-step window; {U} updates =
-   {EP} passes over the 10,600 train trajectories), equal for every condition. Set from the measured throughput:
-   C alone 0.94 s/update (38.5 GB); {CONC}.
-7. **Checkpoint rule.** Validation (250 val trajectories, latent MSE with one 8-step blackout per window) every 2,500
-   updates; the run's checkpoint is the last one unless its validation blind MSE exceeds 1.5x the run's minimum, in
-   which case the minimum-validation checkpoint is used.
-8. **Probe budget.** Each probe pair (Walls, Objects; architecture and optimiser as section 2) is trained for
-   {PP} pass(es) over the first {NP} train trajectories, all steps, one update per 32-trajectory x 48-step window
-   (~{PU} updates), then scored once on the 1,000 eval trajectories. The probe input for C/S/B/R is the full
-   139,248-dimensional state (+4); for G 3,308 (+4); for T 512 (+4); for N 256 (+4). Probe seed = model seed; N gets
-   probe seeds 0-2; K is deterministic.
-9. **B3 metric check, already done:** K on eval = 80.79 % Walls / 24.00 Objects MSE (paper 80.8 / 23.9), both within
-   1 point; definitions used: Walls = mean tile accuracy over all 81 tiles, Objects = squared Euclidean error of each
-   agent-centric object vector averaged over the 3 objects, both averaged over steps 500-1000.
-10. **Order and cuts.** Wave order C s0-4 and G s0-4 first, then S, B, R s0-2, then T s0-2. If the deadline forces a
-   cut, whole conditions are cut in reverse order (T, then R), never seeds of a condition (section 6).
+(none yet)
