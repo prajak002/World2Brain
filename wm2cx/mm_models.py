@@ -10,7 +10,7 @@ FlyBrain.forward would reset to 0). For the transformer the "state" at step t is
 last `ctx` tokens (no state crosses the context window, which is the memory such a model has).
 """
 from __future__ import annotations
-import torch
+import numpy as np, torch, torch.nn as nn
 from wm2cx.student import FlyBrain, GRUBaseline, gru_hidden_for
 from wm2cx.transformer import TransformerWM, transformer_layers_for
 
@@ -45,13 +45,16 @@ def act_prev_of(act, last=None):
     return torch.cat([first, act[:, :-1]], 1)
 
 
-def rollout(model, obs, act_prev, vis, h=None):
-    """Recurrent students: obs [B,T,768] float, act_prev [B,T] long, vis [B,T] -> (z_hat [B,T,256], H [B,T,N], h_last)."""
+def rollout(model, obs, act_prev, vis, h=None, keep=None):
+    """Recurrent students: obs [B,T,768] float, act_prev [B,T] long, vis [B,T] -> (z_hat [B,T,256], H [B,T,N], h_last).
+    keep [B,N] or [N] (1 = intact, 0 = silenced) multiplies the state after every step (in-silico lesion, Amendment 2)."""
     if isinstance(model, TransformerWM):
         H = model.encode(model.tokens(obs, act_prev, vis)); return model.W_out(H), H, None
     w = model.edge_weights(); h = model.init_state(obs.shape[0], obs.device) if h is None else h; hs = []
     for t in range(obs.shape[1]):
-        h = model.step(h, obs[:, t], act_prev[:, t], vis[:, t], w); hs.append(h)
+        h = model.step(h, obs[:, t], act_prev[:, t], vis[:, t], w)
+        if keep is not None: h = h * keep
+        hs.append(h)
     H = torch.stack(hs, 1); return model.W_out(H), H, h
 
 
@@ -67,3 +70,32 @@ def transformer_states(model, obs, act_prev, vis, ctx=48, chunk=4096):
         for i in range(0, len(flat), chunk): res.append(model.encode(flat[i:i + chunk])[:, -1])
         out[:, ctx:] = torch.cat(res).view(B, T - ctx, model.N)
     return out
+
+
+def probe_mlp(i, o):
+    """The benchmark's probe (PREREG section 2): 4 x 1024, LayerNorm eps 1e-3, ELU."""
+    L = []
+    for k in range(4): L += [nn.Linear(i if k == 0 else 1024, 1024), nn.LayerNorm(1024, eps=1e-3), nn.ELU()]
+    return nn.Sequential(*L, nn.Linear(1024, o))
+
+
+def lesion_groups(conn):
+    """Anatomical neuron groups from the FlyWire annotations stored in the graph (PREREG Amendment 2).
+    CX = central complex (cell_class CX); MB = mushroom body: MBON + DAN (region MB) and Kenyon cells (cell_type KC*);
+    OUT = descending neurons; POOL = all other neurons that receive no direct input (candidates for matched random lesions)."""
+    region = conn["region"].astype(str); kc = np.char.startswith(conn["cell_type"].astype(str), "KC")
+    g = dict(CX=np.nonzero(region == "CX")[0], MB=np.nonzero((region == "MB") | kc)[0], OUT=np.nonzero(region == "OUT")[0])
+    g["POOL"] = np.nonzero((region == "OTH") & ~kc)[0]
+    return g
+
+
+def matched_random(conn, idx, pool, rng, n_bins=10):
+    """Random neurons from `pool`: same count as `idx` and the same number per out-degree bin (bins = deciles of the pool's
+    out-degree), so a lesion's effect cannot be explained by how many neurons or how many outgoing edges it removes."""
+    deg = np.bincount(conn["pre"].astype(np.int64), minlength=len(conn["region"]))
+    edges = np.unique(np.quantile(deg[pool], np.linspace(0, 1, n_bins + 1))[1:-1])
+    b_idx, b_pool = np.digitize(deg[idx], edges), np.digitize(deg[pool], edges); out = []
+    for b in np.unique(b_idx):
+        cand = pool[b_pool == b]; n = int((b_idx == b).sum())
+        out.append(rng.choice(cand, size=n, replace=len(cand) < n))
+    return np.sort(np.concatenate(out))

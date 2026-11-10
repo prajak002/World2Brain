@@ -13,7 +13,7 @@ Writes results/memmaze/probe/<label>.json with per-trajectory scores (for the pa
 """
 import argparse, json, os, time, numpy as np, torch, torch.nn as nn
 from wm2cx.memmaze import load_shards, walls_acc, objects_mse, SCORE_FROM, SCORE_TO
-from wm2cx.mm_models import build, rollout, act_prev_of, transformer_states
+from wm2cx.mm_models import build, rollout, act_prev_of, transformer_states, probe_mlp
 from wm2cx.connectome import load as load_conn
 
 p = argparse.ArgumentParser()
@@ -69,12 +69,7 @@ def windows(d, idx):
         yield torch.cat([S, aux[:, s]], -1), lay, tv[:, s], s
 
 
-def mlp(i, o):
-    L = []
-    for k in range(4): L += [nn.Linear(i if k == 0 else 1024, 1024), nn.LayerNorm(1024, eps=1e-3), nn.ELU()]
-    return nn.Sequential(*L, nn.Linear(1024, o)).to(dev)
-
-
+mlp = lambda i, o: probe_mlp(i, o).to(dev)
 pw, po = mlp(feat_dim + 4, 81), mlp(feat_dim + 4, 6)
 opt = torch.optim.Adam(list(pw.parameters()) + list(po.parameters()), lr=3e-4, eps=1e-5)
 rng = np.random.default_rng(a.seed); n_upd = 0; lw, lo = [], []
@@ -100,4 +95,5 @@ with torch.no_grad():
 res = dict(cond=a.cond, label=label, ckpt=a.ckpt, probe_seed=a.seed, walls_acc=SW, objects_mse=SO, mean_walls=float(np.mean(SW)), mean_objects=float(np.mean(SO)),
            n_eval=len(SW), n_probe_train=int(Etr), passes=a.passes, probe_updates=n_upd, feat_dim=feat_dim, final_train_bce=float(np.mean(lw[-200:])),
            final_train_mse=float(np.mean(lo[-200:])), wall_h=(time.time() - t0) / 3600)
+torch.save(dict(pw=pw.state_dict(), po=po.state_dict(), feat_dim=feat_dim, cond=a.cond, ckpt=a.ckpt), f"{a.out}/{label}_probe.pt")   # for the lesion test (Amendment 2)
 json.dump(res, open(J, "w"), indent=1); print(f"{label}: walls {res['mean_walls']:.2f} objects {res['mean_objects']:.2f} ({res['wall_h']:.2f} h)")

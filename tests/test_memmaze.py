@@ -46,3 +46,30 @@ def test_metrics_constant_and_perfect():
     lay = np.array([[1, 0] * 40 + [1]], float)
     assert walls_acc(lay * 20 - 10, lay)[0] == 100.0 and walls_acc(np.full_like(lay, 0.9), lay, is_logit=False)[0] == pytest.approx(100 * 41 / 81)
     t = np.ones((5, 3, 2)); assert objects_mse(t, t).max() == 0 and objects_mse(t * 0, t)[0] == pytest.approx(2.0)
+
+
+def test_lesion_groups_and_matched_random():
+    from wm2cx.mm_models import lesion_groups, matched_random
+    r = np.random.default_rng(0); N = 400
+    region = np.array(["VIS"] * 20 + ["CX"] * 30 + ["MB"] * 10 + ["OUT"] * 10 + ["OTH"] * 330); ct = np.array([""] * N, dtype="U40"); ct[70:90] = "KCab"
+    conn = dict(region=region, cell_type=ct, pre=r.integers(0, N, 5000), post=r.integers(0, N, 5000))
+    g = lesion_groups(conn)
+    assert len(g["CX"]) == 30 and len(g["MB"]) == 30 and len(g["POOL"]) == 310 and not set(g["POOL"]) & (set(g["CX"]) | set(g["MB"]))
+    m = matched_random(conn, g["CX"], g["POOL"], np.random.default_rng(1))
+    assert len(m) == 30 and set(m) <= set(g["POOL"])
+    assert not np.array_equal(m, matched_random(conn, g["CX"], g["POOL"], np.random.default_rng(2)))
+
+
+def test_rollout_keep_silences_neurons():
+    import torch
+    from wm2cx.mm_models import rollout
+
+    class M:
+        N = 5
+        def edge_weights(self): return None
+        def init_state(self, B, dev): return torch.zeros(B, 5)
+        def step(self, h, o, a, v, w): return h + 1
+        def W_out(self, H): return H
+    keep = torch.ones(2, 5); keep[1, :2] = 0
+    _, H, h = rollout(M(), torch.zeros(2, 3, 1), torch.zeros(2, 3).long(), torch.ones(2, 3), keep=keep)
+    assert (H[0] == torch.tensor([1., 2., 3.])[:, None]).all() and (H[1, :, :2] == 0).all() and (H[1, -1, 2:] == 3).all()

@@ -24,3 +24,4 @@ logs/
 paper/main.pdf
 paper_v2/main.pdf
 paper_v2/main.blg
+results/memmaze/**/*.pt
