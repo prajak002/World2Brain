@@ -63,3 +63,15 @@ def objects_mse(pred, target):
     """Per-step object error: squared Euclidean error of each agent-centric object vector, mean over objects.
     pred, target [..., n_obj, 2] -> [...]."""
     return ((pred - target) ** 2).sum(-1).mean(-1)
+
+
+def load_shards(data_dir, names, lat=True, meta=("obs", "act")):
+    """Concatenate encoded shards (scripts/mm_encode.py): {'z': fp16 [n,1001,k] whitened PCA latents, 'obs', 'act', ...}."""
+    out = {k: [] for k in meta}; zs = []
+    for n in names:
+        m = np.load(os.path.join(data_dir, "meta", f"{n}.npz"))
+        for k in meta: out[k].append(m[k])
+        if lat: zs.append(np.load(os.path.join(data_dir, "lat", f"{n}.npy")))
+    out = {k: np.concatenate(v) for k, v in out.items()}
+    if lat: out["z"] = np.concatenate(zs)
+    return out

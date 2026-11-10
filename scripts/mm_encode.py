@@ -97,6 +97,7 @@ elif a.stage == "pca":
     ev, V = np.linalg.eigh(C); o = np.argsort(ev)[::-1]; ev, V = np.clip(ev[o], 0, None), V[:, o]
     P = np.ascontiguousarray(V[:, :a.k]).astype(np.float32); scale = float(np.sqrt(ev[:a.k].sum() / a.k)) + 1e-6
     np.savez(f"{a.out}/pca.npz", mu=mu.astype(np.float32), P=P, scale=scale, explained=ev[:a.k].sum() / ev.sum(), n_steps=n, shards=np.array(names))
+    json.dump(dict(pool=a.pool, train=names, val=[n_ for n_, _ in shards("val")], eval=[n_ for n_, _ in shards("eval")]), open(f"{a.out}/splits.json", "w"), indent=1)
     print(f"PCA-{a.k} on {len(names)} train shards ({n} steps): explained {ev[:a.k].sum() / ev.sum():.3f}")
 
 else:  # project
