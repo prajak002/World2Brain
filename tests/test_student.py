@@ -187,3 +187,14 @@ def test_attn_input_and_hybrid():
     hy0 = FlyBrain(conn, 768, 8, hybrid=True, seed=7); b0 = FlyBrain(conn, 768, 8, seed=7)
     with torch.no_grad(): hy0.W_in.load_state_dict(b0.W_in.state_dict()); hy0.W_out.load_state_dict(b0.W_out.state_dict()); hy0.W_act.load_state_dict(b0.W_act.state_dict())
     assert torch.allclose(hy0(x, a, v)[0], b0(x, a, v)[0], atol=1e-6)
+
+
+def test_lstm_param_matching_state_and_causality():
+    from wm2cx.student import LSTMBaseline, lstm_hidden_for
+    conn = small_conn(); fb = FlyBrain(conn, 24, 8); h = lstm_hidden_for(fb.n_params(), 24, 8); g = LSTMBaseline(24, 8, h)
+    assert g.n_params() <= fb.n_params() < LSTMBaseline(24, 8, h + 1).n_params() and g.param_breakdown()["total"] == g.n_params()
+    x = torch.randn(2, 6, 24); a = torch.randint(0, 5, (2, 6)); v = torch.ones(2, 6)
+    zh, H = g(x, a, v); assert zh.shape == (2, 6, 8) and H.shape == (2, 6, 2 * h) and g.N == 2 * h
+    x2 = x.clone(); x2[:, 4:] += 1.0; zh2, _ = g(x2, a, v)                      # unidirectional: the past never sees the future
+    assert torch.allclose(zh[:, :4], zh2[:, :4]) and not torch.allclose(zh[:, 4:], zh2[:, 4:])
+

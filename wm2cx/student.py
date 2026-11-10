@@ -279,3 +279,32 @@ class GRUBaseline(nn.Module):
         for t in range(T):
             h = self.step(h, obs[:, t], act[:, t - 1] if t > 0 else torch.zeros_like(act[:, 0]), visible[:, t]); hs.append(h)
         H = torch.stack(hs, 1); return self.W_out(H), H
+
+
+def lstm_hidden_for(target_params, obs_dim, z_dim, act_dim=5, vis_flag=True):
+    """Largest hidden size whose LSTMBaseline has <= target_params parameters (#24); same rule as gru_hidden_for."""
+    i = obs_dim + act_dim + int(vis_flag); a, b, c = 4, 4 * i + 8 + z_dim, z_dim - target_params
+    return int((-b + (b * b - 4 * a * c) ** 0.5) / (2 * a))
+
+
+class LSTMBaseline(GRUBaseline):
+    """Parameter-matched unidirectional LSTM (#24); causal like the GRU (a bidirectional LSTM would read frames inside the
+    blind window). The state handed to probes, homing and rollouts is [h | c] (2 x hidden): the cell state is part of its
+    memory. The latent readout uses h only, as in a standard LSTM."""
+    def __init__(self, obs_dim, z_dim, hidden, act_dim=5, vis_flag=True):
+        nn.Module.__init__(self)
+        self.vis_flag = vis_flag; self.hidden = hidden
+        self.cell = nn.LSTMCell(obs_dim + act_dim + int(vis_flag), hidden); self.W_h = nn.Linear(hidden, z_dim)
+        self.N = 2 * hidden; self.act_dim = act_dim; self.wiring = "lstm"; self.n_edges = hidden * hidden; self.dense = False
+
+    def W_out(self, H): return self.W_h(H[..., :self.hidden])
+    def param_breakdown(self):
+        h = self.hidden; rec = 4 * h * h; inp = self.cell.weight_ih.numel(); out = sum(p.numel() for p in self.W_h.parameters())
+        return dict(recurrent=rec, input=inp, output=out, other=self.n_params() - rec - inp - out, total=self.n_params(), edges=self.n_edges)
+    def flops_per_step(self, obs_dim=None):
+        return 2 * (4 * self.hidden * (self.cell.input_size + self.hidden) + self.hidden * self.W_h.out_features)
+    def step(self, h, obs, act, visible, W=None):
+        parts = [obs * visible[:, None], F.one_hot(act, self.act_dim).float()] + ([visible[:, None]] if self.vis_flag else [])
+        hn, cn = self.cell(torch.cat(parts, -1), (h[:, :self.hidden], h[:, self.hidden:]))
+        return torch.cat([hn, cn], -1)
+
