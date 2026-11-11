@@ -341,8 +341,8 @@ they do not: after eight steps in darkness its state gives heading to \nConnAren
 $R^2=\nConnArenaPos$, against \nGruArenaHd\degree\ and \nGruArenaPos\ for the GRU. The code survives 16 to 20 dark
 steps, continuous turn angles and a twin of Manhattan, and with a small policy head the agent walks home after 24 to 30
 dark steps in \nBkConnArenaTw--\nBkConnArenaTh\ of episodes against \nBkGruArenaTw--\nBkGruArenaTh\ for the GRU. Real
-wiring adds a small, consistent gain over shuffled wiring. A pre-registered whole-brain evaluation on Memory Maze with
-in-silico circuit lesions is specified. Code, environments and checkpoints are released.
+wiring beats every rewired control, by about 1\,\% of prediction error on the circuit and by 8 to 11\,\% on the whole
+brain, where it also out-predicts the transformer. Code, environments and checkpoints are released.
 \end{abstract}
 % ================= sec/1_intro.tex =================
 \section{Introduction}
@@ -775,34 +775,36 @@ predict \emph{better} than the real one, so the small real-wiring gain in predic
 \label{sec:scale}
 \begin{table}[t]
   \centering\footnotesize
-  \caption{\textbf{From a circuit to the whole brain.} The same student equation on the navigation subgraph and on
-  every proofread neuron of \flywire\ v783. Baselines are re-matched to the whole-brain parameter count.}
+  \caption{\textbf{Whole brain: blind latent prediction} (139,248 neurons, 2,700,429 signed edges; every model within
+  2\,\% of 41.3\,M parameters; mean\pm sd over 3 seeds). $\Delta$: paired difference to the connectome over 400 shared
+  test episodes with a 95\,\% bootstrap interval; every $\Delta$ has Holm-corrected $p<0.001$.}
   \label{tab:scale}
-  \setlength{\tabcolsep}{4pt}\begin{tabular}{lcc}
+  \setlength{\tabcolsep}{3pt}\resizebox{\columnwidth}{!}{\begin{tabular}{lccc}
     \toprule
-    & circuit & whole brain \\
+    & \multicolumn{2}{c}{Arena} & Cont.\ turns \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-4}
+    whole-brain wiring & MSE $\downarrow$ & $\Delta$ to connectome & MSE $\downarrow$ \\
     \midrule
-    neurons & 6,935 & 139,248 \\
-    signed edges ($\ge5$ synapses) & 91,663 & 2,700,429 \\
-    parameters & 3.71\,M & 41.39\,M \\
-    GRU hidden units at equal parameters & 762 & 3,308 \\
-    transformer at equal parameters & 4 layers & 13 layers, width 512 \\
-    Memory Maze steps (train / eval) & -- & 10.6\,M / 1.0\,M \\
+    GRU, parameter-matched & \textbf{0.416\pm0.004} & $-0.207$ [$-0.226$, $-0.189$] & \textbf{0.415\pm0.007} \\
+    \textbf{connectome} & 0.624\pm0.005 & reference & 0.618\pm0.003 \\
+    Transformer, parameter-matched & 0.671\pm0.040 & $+0.047$ [$+0.037$, $+0.058$] & 0.658\pm0.051 \\
+    random & 0.680\pm0.002 & $+0.056$ [$+0.049$, $+0.064$] & 0.674\pm0.002 \\
+    block-shuffled & 0.693\pm0.004 & $+0.069$ [$+0.061$, $+0.077$] & 0.684\pm0.001 \\
+    degree-shuffled & 0.703\pm0.005 & $+0.079$ [$+0.070$, $+0.088$] & 0.697\pm0.004 \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
 \end{table}
 Nothing in \cref{eq:student} depends on the size of the graph, so the same student runs on every proofread neuron of
-the fly brain (\cref{tab:scale}). At this size a dense control is no longer possible ($139{,}248^2$ weights), and the
-GRU and transformer are re-matched to 41.4\,M parameters. We evaluate the whole-brain student in two ways, both
-registered before any run. (i) The in-house benchmarks of this section, with degree-shuffled, block-shuffled and random
-whole-brain graphs, a GRU and a transformer, three seeds each. (ii) Memory Maze~\cite{pasukonis2023memmaze}, an
-external long-term memory benchmark, under its published offline-probing protocol: the students predict \vjepa\ latents
-along 1,000-step trajectories of the $9\times9$ maze, and a frozen-state probe is scored on wall layout and object
-vectors over steps 500 to 1,000, next to the published baselines. Because the state is a set of named neurons, we add a
-test no free recurrence allows: \emph{in-silico lesions}. The registered hypothesis is that silencing the central
-complex hurts object-vector memory more than silencing a random set matched in size and out-degree, more than silencing
-the mushroom body, and only in the real wiring. These runs are pre-registered and were unfinished at submission; we
-make no claim from them.
+the fly brain. A dense control is no longer possible ($139{,}248^2$ weights), and the GRU (3,302 units) and the
+transformer are re-matched to the whole-brain budget. \Cref{tab:scale} gives the result. The ordering found on the
+circuit survives and the margins grow: the real wiring is 8 to 11\,\% better than every rewired whole-brain graph,
+against about 1\,\% on the circuit, and at this size it also beats the parameter-matched transformer. The GRU remains
+the best predictor. The first heading probes agree with the circuit: a block-shuffled whole brain holds heading to 13 to
+15\degree\ through 8 dark steps where the GRU gives 32 to 35\degree\ and the transformer 41 to 43\degree\ (two seeds
+each). The connectome's own whole-brain probe and the homing runs were unfinished at submission. So was a registered
+evaluation on Memory Maze~\cite{pasukonis2023memmaze} under its published offline-probing protocol, with
+\emph{in-silico lesions} of the central complex and mushroom body, a test no free recurrence allows; we make no claim
+from either.
 
 \subsection{What is outperformed, and what is not}
 \label{sec:scorecard}
@@ -860,8 +862,8 @@ fly's version is a little better'' is the paper. A mechanistic hypothesis is giv
 (i) Blind return with the policy head uses two connectome seeds and one seed for the GRU, dense and NYC rows; shuffled
 wirings and the transformer are pre-registered but not yet run under this readout. (ii) Actions are given to the student in the dark.
 (iii) The environments are synthetic, and on real video no student beats copy-last zero-shot. (iv) The teacher is
-ViT-B at 256\,px and the NYC twin is one location. (v) The LSTM, graph-network and structured-loss rows use 3 seeds, and the whole-brain and Memory Maze evaluations
-of \cref{sec:scale} are registered but unfinished. (vi) The EPG population does not carry the heading code; the
+ViT-B at 256\,px and the NYC twin is one location. (v) The LSTM, graph-network, structured-loss and whole-brain rows use 3 seeds; the whole-brain heading and homing
+evaluations and Memory Maze (\cref{sec:scale}) are registered but unfinished. (vi) The EPG population does not carry the heading code; the
 biological ring attractor does not emerge at this scale and we do not claim it.
 
 \section{Conclusion}
