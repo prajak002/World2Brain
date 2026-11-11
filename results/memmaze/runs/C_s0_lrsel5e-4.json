@@ -1,0 +1,48 @@
+{
+ "cond": "C",
+ "seed": 0,
+ "args": {
+  "cond": "C",
+  "seed": 0,
+  "data": "data/mm9",
+  "conn": "data/connectome_full.npz",
+  "updates": 1500,
+  "bs": 32,
+  "window": 48,
+  "lr": 0.0005,
+  "warmup": 1000,
+  "H": 8,
+  "d_model": 512,
+  "eval_every": 2500,
+  "n_val": 250,
+  "out": "results/memmaze/runs",
+  "tag": "_lrsel5e-4",
+  "device": "cuda",
+  "n_train": 0
+ },
+ "info": {},
+ "params": 41393175,
+ "param_breakdown": {
+  "recurrent": 2700429,
+  "input": 2627258,
+  "output": 35647744,
+  "other": 417744,
+  "total": 41393175,
+  "edges": 2700429
+ },
+ "neurons": 139248,
+ "n_train_traj": 10600,
+ "updates": 1500,
+ "log": [
+  {
+   "u": 1500,
+   "loss": 1.2615483445723852,
+   "mse_vis": 0.8183824212896479,
+   "mse_blind": 0.9337170471918015,
+   "t": 1920.5061626434326
+  }
+ ],
+ "chosen_ckpt": "C_s0_lrsel5e-4_u1500.pt",
+ "chosen_u": 1500,
+ "wall_h": 0.5336345698436101
+}
