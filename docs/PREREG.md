@@ -192,3 +192,29 @@ are kept in `logs/b4_lr1e-3_diverged_2026-11-11/`. Amendment 1 item 5 ("no furth
    deadline.
 6. **Reporting.** The diverged 1e-3 attempt and the selection runs are reported in the paper's supplement with their
    losses. Hypotheses H1-H7, metrics, seeds, statistics and the probe protocol are unchanged.
+
+### Amendment 4 — 2026-11-11 18:40 UTC, Amendment 3 rescinded: B4 runs at the Amendment-1 learning rates (no eval trajectory used)
+**Why.** Amendment 3 treated the rising training loss of the whole-brain students during warmup as divergence. Two
+pieces of evidence, both from training/validation data only, show that reading was premature.
+1. *The same transient occurs, and recovers, in the in-house whole-brain runs at the same rate* (batch A, lr 1e-3,
+   `logs/train_*_full.log`): connectome seed 0 has training loss 2.71 at epoch 4 of 20, 1.46 at epoch 9, 0.95 at epoch
+   14 and 0.74 at the end; degree-shuffled seed 0 has 6.93, 2.75, 1.29, 0.90. Both end as valid models (blind MSE 0.63
+   and 0.71). The Memory Maze runs were stopped at 5-9 % of their budget, inside that transient.
+2. *The selection runs of Amendment 3 give no reason to lower the rate.* C seed 0, 1,500 updates, validation blind MSE:
+   0.972 (1e-4), 0.956 (2e-4), 0.951 (3e-4), 0.934 (5e-4): monotonically better with a higher rate. (Because warmup
+   and cosine overlap in a 1,500-update run, the peak rates actually reached were 0.39x nominal, i.e. 3.9e-5 to 2.0e-4,
+   so these runs never tested the rates they were named for; and the "training loss > 1.0" criterion was on the wrong
+   scale, the constant predictor's training loss being about 1.23 with the 3x blind weighting.) GRU seed 0, same
+   protocol: 0.631 (5e-4), 0.582 (1e-3), 0.538 (2e-3), 0.512 (4e-3).
+
+**Decision (registered before the relaunch).**
+1. Amendment 3 items 1-5 are rescinded. B4 runs exactly as Amendment 1 specifies: C/S/B/R/T at 1e-3, G at 2e-3,
+   canonical run names, 12,000 updates, same seeds. The five stopped runs (C s0-2, S s0-1) are restarted from update 0
+   (no checkpoint existed); G seeds 0 and 1 stand.
+2. No run is stopped early again. A whole-brain run counts as failed only if the validation blind MSE of its chosen
+   checkpoint is >= 1.0 (the constant predictor's level in this whitened space); failed runs are reported as failures,
+   and if C fails on a majority of seeds H1-H5 and H7 are reported as not testable.
+3. Two side conditions, labelled and outside every hypothesis family, reported in the supplement: `C_s0_lr2e-4`
+   (a lower-rate whole-brain run, to show what the rate does) and `G_s{0,1,2}_lr4e-3` (the GRU at the rate its
+   selection run preferred, so that the reader can see the GRU was not held back).
+4. The stopped attempt, the selection runs and this reversal are reported in the supplement.
