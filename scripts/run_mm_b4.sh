@@ -7,7 +7,8 @@ set -u; cd "$(dirname "$0")/.."; export PYTHONPATH=.; mkdir -p logs results/memm
 PY="${PY:-uv run python}"; JOBS="${JOBS:-3}"; U="${U:-12000}"; WAVES="${WAVES:-1 2 3}"
 [ -f data/mm9/pca.npz ] || $PY scripts/mm_encode.py --stage pca --pool 0 1 2 3 2>&1 | tee logs/mm_pca.log
 [ -f data/mm9/pca.npz ] || { echo "PCA failed"; exit 1; }
-$PY scripts/mm_encode.py --stage project --splits eval train val 2>&1 | tee -a logs/mm_project.log
+$PY scripts/mm_encode.py --stage project --splits eval train val --pool 0 1 2 3 2>&1 | tee -a logs/mm_project.log
+[ "$(ls data/mm9/lat/*.npy 2>/dev/null | wc -l)" -ge 126 ] || { echo "projection failed (see logs/mm_project.log)"; exit 1; }
 runs() { case "$1" in
   1) for s in 0 1 2 3 4; do echo "C $s"; echo "G $s"; done ;;
   2) for c in S B R; do for s in 0 1 2; do echo "$c $s"; done; done ;;
