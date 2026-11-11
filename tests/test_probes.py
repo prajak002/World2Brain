@@ -22,3 +22,16 @@ def test_dual_branch_matches_primal_when_features_exceed_samples():
     Ytr = Xtr @ W + 0.1 * r.normal(size=(120, 2))
     a, b = ridge_fit_predict(Xtr, Ytr, Xte, 100.0), _primal(Xtr, Ytr, Xte, 100.0)
     assert np.abs(a - b).max() < 1e-3 * np.abs(b).max()
+
+
+def test_ridge_weights_primal_and_dual_match_the_closed_form():
+    import torch
+    from wm2cx.probes import ridge_weights
+    r = np.random.default_rng(2)
+    for n, f in ((300, 40), (80, 500)):                      # primal branch, dual branch
+        X = (r.normal(size=(n, f)) + 0.5).astype(np.float32); Y = (X[:, :3] @ r.normal(size=(3, 4)) + 0.1 * r.normal(size=(n, 4))).astype(np.float32)
+        mu, W, ym = ridge_weights(torch.from_numpy(X), torch.from_numpy(Y), 100.0, "cpu", chunk=64)
+        Xc = X.astype(np.float64) - X.astype(np.float64).mean(0)
+        ref = np.linalg.solve(Xc.T @ Xc + 100.0 * np.eye(f), Xc.T @ (Y - Y.mean(0)))
+        assert np.abs(W.numpy() - ref).max() < 1e-4 * np.abs(ref).max() + 1e-6
+        assert np.allclose(mu.numpy(), X.mean(0), atol=1e-5) and np.allclose(ym.numpy(), Y.mean(0), atol=1e-5)

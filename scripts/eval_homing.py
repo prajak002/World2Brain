@@ -29,6 +29,7 @@ import argparse, json, os, time, numpy as np, torch
 from wm2cx.ckpt import load_run
 from wm2cx.data import load_split
 from wm2cx.env import FlyArena, scripted_policy
+from wm2cx.probes import ridge_weights
 
 p = argparse.ArgumentParser()
 p.add_argument("--run", default="connectome_K1_s0"); p.add_argument("--device", default="cuda")
@@ -46,6 +47,9 @@ p.add_argument("--backward", type=int, default=1, help="step backward when home 
 p.add_argument("--verbose", type=int, default=0, help="print the decoded pose and action at every blind step of the first episodes")
 p.add_argument("--tag", default=""); a = p.parse_args()
 dev = a.device; rng = np.random.default_rng(a.seed); torch.manual_seed(a.seed)
+J = f"results/homing/{a.run}_{a.env}_{a.readout}{a.tag}.json"
+if os.path.exists(J): print("done already:", J); raise SystemExit
+big = False                                                     # whole-brain states: kept on the CPU, ridge solved in dual form
 eh, ew = 8, 32; R_SUCC = a.radius or (1.0 if a.env == "arena" else 12.0); R_STOP = a.stop_frac * R_SUCC
 TURN = np.pi / 8; TOL = np.deg2rad(a.tol_deg)
 
@@ -92,7 +96,7 @@ def fit_rollouts(n):
         for t in range(a.t_vis + a.t_blind):
             visible = t < a.t_vis; o = eye(img) if visible else torch.zeros(eh * ew * 3, device=dev)
             with torch.no_grad(): h = model.step(h, o[None], prev, torch.full((1,), float(visible), device=dev), W)
-            true = rel_pose(env.pos, env.heading, pos0, hd0); Xs.append(h[0]); Ys.append(true)
+            true = rel_pose(env.pos, env.heading, pos0, hd0); Xs.append(h[0].cpu() if big else h[0]); Ys.append(true)
             if visible: ac = pol(); As.append(-1)
             else:
                 star = controller(true, n_turn)[0]; As.append(star)                            # expert label (DAgger-style: the state is the agent's own)
@@ -123,6 +127,7 @@ if a.readout == "policy":                                        # lever 1: beha
 if a.readout in ("state", "mlp"):
     model, args, conn, lat = load_run(a.run, device=dev); W = model.edge_weights()
     tr, _ = load_split(args["train"], lat, with_z=False); E, T = tr["obs"].shape[:2]      # teacher latents are not needed here (and slow to load)
+    big = a.readout == "state" and model.N > 20000
     Y = np.zeros((E, T, 4), np.float32)
     pos, hd = tr["pos"].numpy(), tr["heading"].numpy()
     for e in range(E):
@@ -133,28 +138,27 @@ if a.readout in ("state", "mlp"):
         for i in range(0, E, 64):
             obs, act = tr["obs"][i:i + 64].to(dev), tr["act"][i:i + 64].to(dev)
             vis = torch.ones(obs.shape[:2], device=dev); vis[:, a.t_vis:] = 0            # deployment protocol: visible, then blind
-            _, H = model(obs, act, vis); Hs.append(H.reshape(-1, model.N).float())
-    X = torch.cat(Hs); Yt = torch.from_numpy(Y.reshape(-1, 4)).to(dev); n_tr = len(X)
-    if a.fit_rollouts > 0: Xr, Yr = fit_rollouts(a.fit_rollouts); X, Yt = torch.cat([X, Xr]), torch.cat([Yt, Yr])
-    mu_x, mu_y = X.mean(0), Yt.mean(0)
+            _, H = model(obs, act, vis); H = H.reshape(-1, model.N).float(); Hs.append(H.cpu() if big else H)
+    X = torch.cat(Hs); del Hs; Yt = torch.from_numpy(Y.reshape(-1, 4)).to(dev); n_tr = len(X)
+    if a.fit_rollouts > 0: Xr, Yr = fit_rollouts(a.fit_rollouts); X, Yt = torch.cat([X, Xr]), torch.cat([Yt, Yr]); del Xr
+    predict = lambda f: torch.cat([f(X[i:i + 4096].to(dev)) for i in range(0, len(X), 4096)])
     def r2_report(pred):
         r2 = lambda sl: [round(float(v), 3) for v in 1 - ((pred[sl] - Yt[sl]) ** 2).sum(0) / ((Yt[sl] - Yt[sl].mean(0)) ** 2).sum(0)]
         return f"R2 cos/sin/dx/dy = {r2(slice(0, n_tr))} on {E} train episodes" + (f", {r2(slice(n_tr, None))} on {a.fit_rollouts} closed-loop rollouts" if a.fit_rollouts > 0 else "")
     if a.readout == "state":
-        Xc = X - mu_x; A = Xc.T @ Xc + a.lam * torch.eye(model.N, device=dev)
-        Wr = torch.linalg.solve(A, Xc.T @ (Yt - mu_y))
+        mu_x, Wr, mu_y = ridge_weights(X, Yt, a.lam, dev)             # float64, TF32 off; dual form on whole-brain states
         readout = lambda h: (h - mu_x) @ Wr + mu_y
-        print(f"ridge readout fit: {r2_report(readout(X))}", flush=True)
+        print(f"ridge readout fit ({'dual' if model.N > len(X) else 'primal'}, float64): {r2_report(predict(readout))}", flush=True)
     else:
-        sd_x = X.std(0) + 1e-6; net = torch.nn.Sequential(torch.nn.Linear(model.N, 256), torch.nn.Tanh(), torch.nn.Linear(256, 4)).to(dev)
+        mu_x = X.mean(0); sd_x = X.std(0) + 1e-6; net = torch.nn.Sequential(torch.nn.Linear(model.N, 256), torch.nn.Tanh(), torch.nn.Linear(256, 4)).to(dev)
         opt = torch.optim.Adam(net.parameters(), 1e-3, weight_decay=1e-5); n = len(X)
         for ep in range(30):
             perm = torch.randperm(n, device=dev)
             for i in range(0, n, 1024):
                 j = perm[i:i + 1024]; loss = ((net((X[j] - mu_x) / sd_x) - Yt[j]) ** 2).mean(); opt.zero_grad(); loss.backward(); opt.step()
         net.eval(); readout = lambda h: net((h - mu_x) / sd_x)
-        with torch.no_grad(): print(f"mlp readout fit: {r2_report(readout(X))}", flush=True)
-    del X, Hs
+        with torch.no_grad(): print(f"mlp readout fit: {r2_report(predict(readout))}", flush=True)
+    del X
 
 
 t0 = time.time(); succ, dfinal, eff, dstart_blind, drift = [], [], [], [], []; ep = -1; done = 0
@@ -207,4 +211,4 @@ res = dict(run=a.run, env=a.env, readout=a.readout, t_vis=a.t_vis, t_blind=a.t_b
            success=float(np.mean(succ)), dist_blind_start=float(np.mean(dstart_blind)), dist_final=float(np.mean(dfinal)), path_efficiency=float(np.mean(eff)),
            drift_end=(float(np.mean(drift)) if drift else None), per_episode_final=[round(x, 3) for x in dfinal], per_episode_drift=[round(x, 3) for x in drift])
 print(json.dumps({k: v for k, v in res.items() if k != "per_episode_final"}))
-os.makedirs("results/homing", exist_ok=True); json.dump(res, open(f"results/homing/{a.run}_{a.env}_{a.readout}{a.tag}.json", "w"), indent=1)
+os.makedirs("results/homing", exist_ok=True); json.dump(res, open(J, "w"), indent=1)

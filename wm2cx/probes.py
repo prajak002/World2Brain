@@ -55,3 +55,36 @@ def ridge_fit_predict(Xtr, Ytr, Xte, lam, device=None):
     K = (Xtr @ Xtr.T).astype(np.float64); K[np.diag_indices(n)] += lam
     alpha = np.linalg.solve(K, Yc.astype(np.float64)).astype(Xtr.dtype)
     return Xte @ (Xtr.T @ alpha) + ym
+
+
+def ridge_weights(X, Y, lam, device, chunk=4096):
+    """Centred (not standardised) ridge used by scripts/eval_homing.py: returns (mu_x [f], W [f, k], mu_y [k]) as float32 on
+    `device`, so that the readout is (h - mu_x) @ W + mu_y. X is a float32 torch tensor [n, f] on any device (kept on the
+    CPU for whole-brain states), Y is [n, k]. Everything is accumulated in float64 with TF32 off (see the module note);
+    primal normal equations when f <= n, dual form otherwise (the 139,248-column primal matrix would be 72 GB in fp32)."""
+    import torch
+    cd = "cpu" if str(device).startswith("mps") else device      # no float64 on MPS
+    tf32 = torch.backends.cuda.matmul.allow_tf32
+    torch.backends.cuda.matmul.allow_tf32 = False
+    try:
+        with torch.no_grad():
+            n, f = X.shape
+            Yd = Y.to(cd).double(); ym = Yd.mean(0); Yc = Yd - ym
+            mu = torch.cat([X[:, j:j + chunk].to(cd).double().mean(0) for j in range(0, f, chunk)])
+            if f <= n:
+                A = torch.zeros(f, f, dtype=torch.float64, device=cd); B = torch.zeros(f, Yc.shape[1], dtype=torch.float64, device=cd)
+                for i in range(0, n, chunk):
+                    r = X[i:i + chunk].to(cd).double() - mu
+                    A.addmm_(r.T, r); B.addmm_(r.T, Yc[i:i + chunk])
+                A.diagonal().add_(lam); W = torch.linalg.solve(A, B)
+            else:
+                K = torch.zeros(n, n, dtype=torch.float64, device=cd)
+                for j in range(0, f, chunk):
+                    c = X[:, j:j + chunk].to(cd).double() - mu[j:j + chunk]; K.addmm_(c, c.T)
+                K.diagonal().add_(lam); Kc = K.cpu().numpy(); del K            # solve on the CPU, in place: the GPU may be shared
+                from scipy.linalg import solve
+                alpha = torch.from_numpy(solve(Kc, Yc.cpu().numpy(), assume_a="pos", overwrite_a=True)).to(cd); del Kc
+                W = torch.cat([(X[:, j:j + chunk].to(cd).double() - mu[j:j + chunk]).T @ alpha for j in range(0, f, chunk)])
+            return mu.float().to(device), W.float().to(device), ym.float().to(device)
+    finally:
+        torch.backends.cuda.matmul.allow_tf32 = tf32
