@@ -78,12 +78,19 @@ def ridge_weights(X, Y, lam, device, chunk=4096):
                     A.addmm_(r.T, r); B.addmm_(r.T, Yc[i:i + chunk])
                 A.diagonal().add_(lam); W = torch.linalg.solve(A, B)
             else:
-                K = torch.zeros(n, n, dtype=torch.float64, device=cd)
+                on_dev = True                                                 # does the n x n Gram matrix fit on the (possibly shared) GPU?
+                if str(cd).startswith("cuda"): on_dev = torch.cuda.mem_get_info(cd)[0] > 8 * n * n + 3 * 8 * n * chunk + (2 << 30)
+                K = torch.zeros(n, n, dtype=torch.float64, device=cd if on_dev else "cpu")
                 for j in range(0, f, chunk):
-                    c = X[:, j:j + chunk].to(cd).double() - mu[j:j + chunk]; K.addmm_(c, c.T)
+                    c = X[:, j:j + chunk].to(cd).double() - mu[j:j + chunk]
+                    if on_dev: K.addmm_(c, c.T)
+                    else:                                                     # products on the GPU in row blocks, accumulated on the CPU
+                        for i in range(0, n, chunk): K[i:i + chunk] += (c[i:i + chunk] @ c.T).cpu()
                 K.diagonal().add_(lam); Kc = K.cpu().numpy(); del K            # solve on the CPU, in place: the GPU may be shared
-                from scipy.linalg import solve
-                alpha = torch.from_numpy(solve(Kc, Yc.cpu().numpy(), assume_a="pos", overwrite_a=True)).to(cd); del Kc
+                from scipy.linalg.lapack import dposv                         # Cholesky solve in place (K is symmetric, so K.T is the
+                _, al, info = dposv(Kc.T, Yc.cpu().numpy(), overwrite_a=1)   # same matrix in Fortran order: no 8 n^2 copy)
+                assert info == 0, f"dposv info {info}"
+                alpha = torch.from_numpy(al).to(cd); del Kc
                 W = torch.cat([(X[:, j:j + chunk].to(cd).double() - mu[j:j + chunk]).T @ alpha for j in range(0, f, chunk)])
             return mu.float().to(device), W.float().to(device), ym.float().to(device)
     finally:

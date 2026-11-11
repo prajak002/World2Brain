@@ -132,15 +132,24 @@ if a.readout in ("state", "mlp"):
     pos, hd = tr["pos"].numpy(), tr["heading"].numpy()
     for e in range(E):
         for t in range(T): Y[e, t] = rel_pose(pos[e, t], hd[e, t], pos[e, 0], hd[e, 0])
-    Hs = []
+    Hs = []; n_roll = a.fit_rollouts * (a.t_vis + a.t_blind)
+    if big: X = torch.empty(E * T + n_roll, model.N)             # filled in place: a list plus torch.cat would hold the states twice
     with torch.no_grad():
         W = model.edge_weights()
         for i in range(0, E, 64):
             obs, act = tr["obs"][i:i + 64].to(dev), tr["act"][i:i + 64].to(dev)
             vis = torch.ones(obs.shape[:2], device=dev); vis[:, a.t_vis:] = 0            # deployment protocol: visible, then blind
-            _, H = model(obs, act, vis); H = H.reshape(-1, model.N).float(); Hs.append(H.cpu() if big else H)
-    X = torch.cat(Hs); del Hs; Yt = torch.from_numpy(Y.reshape(-1, 4)).to(dev); n_tr = len(X)
-    if a.fit_rollouts > 0: Xr, Yr = fit_rollouts(a.fit_rollouts); X, Yt = torch.cat([X, Xr]), torch.cat([Yt, Yr]); del Xr
+            _, H = model(obs, act, vis); H = H.reshape(-1, model.N).float()
+            if big: X[i * T:i * T + len(H)] = H.cpu()
+            else: Hs.append(H)
+    Yt = torch.from_numpy(Y.reshape(-1, 4)).to(dev); n_tr = E * T
+    if not big: X = torch.cat(Hs)
+    del Hs
+    if a.fit_rollouts > 0:
+        Xr, Yr = fit_rollouts(a.fit_rollouts); Yt = torch.cat([Yt, Yr])
+        if big: X[n_tr:] = Xr
+        else: X = torch.cat([X, Xr])
+        del Xr
     predict = lambda f: torch.cat([f(X[i:i + 4096].to(dev)) for i in range(0, len(X), 4096)])
     def r2_report(pred):
         r2 = lambda sl: [round(float(v), 3) for v in 1 - ((pred[sl] - Yt[sl]) ** 2).sum(0) / ((Yt[sl] - Yt[sl].mean(0)) ** 2).sum(0)]

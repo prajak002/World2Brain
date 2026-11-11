@@ -108,3 +108,33 @@ Template:
 - prereg items: none yet; no eval trajectory has been read by any trained model
 - outputs: `results/memmaze/runs/{G_s0,G_s1}.json` (registered runs), `*_lrsel*.json` (selection runs)
   logs: box `logs/b4_lr1e-3_diverged_2026-11-11/`, `logs/lrsel_2026-11-11/`, `logs/b4_*.log`
+
+## 2026-11-11 (20:15-21:00 UTC) — box cleanup; homing readout in float64 / dual form; whole-brain homing started
+
+Box: Vast 60172952 (2x H200). Code: a55f182 plus the follow-up commit that carries this entry.
+
+**Cleanup (disk was 95 % full, 5.9 GB free, with ~28 GB of Memory Maze checkpoints still to be written).** Removed on the box:
+`/root/mm9dl/x_{eval,part0-3}` (41 GB, the Memory Maze episode downloads; re-downloadable, the four train parts are also on
+the lab Drive), `data/mm9/stats` (14 GB, PCA sufficient statistics; `pca.npz` is fitted and kept), `/dev/shm/mm9raw`
+(91 GB of RAM, the un-projected encoder latents; all 126 shards are projected in `data/mm9/lat`, metadata in `data/mm9/meta`),
+and the `_resume.pt` restart files of the 13 Memory Maze runs whose result JSON exists (6.7 GB; `train_mm.py` exits on
+the JSON, so they can no longer be read). No result JSON, `_u<update>.pt` checkpoint, log, projected latent or metadata
+file was removed. Consequence: the PCA cannot be refitted without re-downloading and re-encoding (about 6 h); the
+pre-registration fixes the PCA, so no registered stage needs it. Disk after: 36 % used; RAM 99 / 251 GB.
+
+**Homing readout.** `eval_homing.py` built its ridge normal equations in float32 on the GPU, under TF32 when the pipeline
+exports `TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1` (the mode that broke the first GPU heading probe), and needed a
+139,248^2 matrix at whole-brain size. It now calls `wm2cx.probes.ridge_weights`: float64, TF32 off, primal when
+features <= samples, dual otherwise (states held on the CPU, Gram products on the GPU in blocks, in-place Cholesky solve).
+Test: `tests/test_probes.py::test_ridge_weights_primal_and_dual_match_the_closed_form`.
+
+**Check of the old numbers (one run).** `gru_K1_s0_full`, arena, same seeds: old float32/TF32 readout success 0.06, final
+distance 3.240, path efficiency 0.264, drift 3.524; float64 readout 0.06, 3.263, 0.263, 3.551
+(`results/homing_checks/gru_K1_s0_full_arena_state_f64check.json`). The primal float32 readout was therefore not broken the
+way the dual heading probe was, on this 3,302-unit model. The circuit-scale checkpoints (6,935 units) are not on this box, so
+the circuit homing numbers themselves have not been re-run; that check is still owed before the camera-ready.
+
+**Whole-brain homing (running, tmux `hom`, GPU 0 shared with training, ~16 min per sparse run, 36 runs).** First result,
+`connectome_K1_s0_full`: readout R2 0.80-0.91 on the fit set, success 0.06, final distance 2.23 (GRU s0: 0.06, 3.26). Two
+failed attempts before it (GPU and then host memory at 58,800 fit samples; logs `logs/hom_f64.log`, `logs/hom_f64_b.log`).
+No claim until all seeds and wirings are in. The Blackout stage at whole-brain size has not been started.
