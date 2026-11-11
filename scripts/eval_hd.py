@@ -73,7 +73,7 @@ def r2(pred, Y): return float(1 - ((pred - Y) ** 2).sum() / ((Y - Y.mean(0)) ** 
 
 
 def ridge_r2(Xtr, Ytr, Xte, Yte, lam):
-    pred = ridge_fit_predict(Xtr, Ytr, Xte, lam); return r2(pred, Yte), pred   # primal or dual form, same solution (wm2cx/probes.py)
+    pred = ridge_fit_predict(Xtr, Ytr, Xte, lam, device=dev); return r2(pred, Yte), pred  # primal or dual form, same solution (wm2cx/probes.py)
 
 
 def mlp_r2(Xtr, Ytr, Xte, Yte, lam=None, hidden=256, epochs=30):
