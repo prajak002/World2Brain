@@ -40,14 +40,16 @@ b0, b1 = (int(x) for x in a.blind.split(":")); T = te["obs"].shape[1]
 
 
 def states(d, blind):
-    Hs = []
+    out = None                                                    # filled in place: a list + cat doubles the peak (27 GB on the whole brain)
     with torch.no_grad():
         for i in range(0, len(d["obs"]), 64):
             obs, act = d["obs"][i:i + 64].to(dev), d["act"][i:i + 64].to(dev)
             vis = torch.ones(obs.shape[:2], device=dev)
             if blind: vis[:, b0:b1] = 0
-            _, H = model(obs, act, vis); Hs.append(H.cpu())
-    return torch.cat(Hs)
+            _, H = model(obs, act, vis); H = H.cpu()
+            if out is None: out = torch.empty((len(d["obs"]),) + tuple(H.shape[1:]), dtype=H.dtype)
+            out[i:i + len(H)] = H
+    return out
 
 
 def action_features(d):
@@ -106,6 +108,7 @@ for reg in ("CX", "EPG"):                                        # size-matched 
 Atr, Ate = action_features(tr), action_features(te); Ite = integrated(te)
 out = {}
 for blind in (False, True):
+    Htr = Hte = feats = None                                      # free the previous pass before building the next one
     Htr, Hte = states(tr, blind).numpy(), states(te, blind).numpy()
     sl = slice(b0, b1) if blind else slice(0, T)
     # heading relative to the episode's first heading (a ring attractor is anchored arbitrarily per environment),
@@ -116,7 +119,8 @@ for blind in (False, True):
         dpr = np.stack([c * dp[..., 0] + s_ * dp[..., 1], -s_ * dp[..., 0] + c * dp[..., 1]], -1) / 6.0
         return np.stack([np.cos(dth), np.sin(dth)], -1)[:, sl].reshape(-1, 2), dpr[:, sl].reshape(-1, 2)
     ytr, ptr = rel(tr); yte, pte = rel(te)
-    feats = {g: (Htr[:, sl][:, :, m].reshape(-1, m.sum()), Hte[:, sl][:, :, m].reshape(-1, m.sum())) for g, m in groups.items() if m.sum() > 0}
+    pick = lambda H, m: H[:, sl].reshape(-1, H.shape[-1]) if m.all() else H[:, sl][:, :, m].reshape(-1, m.sum())   # no fancy-index copy for the all-neuron group
+    feats = {g: (pick(Htr, m), pick(Hte, m)) for g, m in groups.items() if m.sum() > 0}
     feats["actions_only"] = (Atr[:, sl].reshape(-1, 6), Ate[:, sl].reshape(-1, 6))
     if f"all@{a.match_n}" in feats:
         feats[f"actions+all@{a.match_n}"] = tuple(np.concatenate([x, y], 1) for x, y in zip(feats["actions_only"], feats[f"all@{a.match_n}"]))
