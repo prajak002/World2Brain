@@ -20,6 +20,7 @@ Controls (#7):
 import argparse, json, numpy as np, torch, os
 from wm2cx.ckpt import load_run
 from wm2cx.data import load_split
+from wm2cx.probes import ridge_fit_predict
 
 p = argparse.ArgumentParser(); p.add_argument("--run", required=True); p.add_argument("--device", default="mps")
 p.add_argument("--match_n", type=int, default=1400, help="feature-matched subset size (GRU hidden size)"); p.add_argument("--lam", type=float, default=100.0)
@@ -72,9 +73,7 @@ def r2(pred, Y): return float(1 - ((pred - Y) ** 2).sum() / ((Y - Y.mean(0)) ** 
 
 
 def ridge_r2(Xtr, Ytr, Xte, Yte, lam):
-    mu, sd = Xtr.mean(0), Xtr.std(0) + 1e-6; Xtr = (Xtr - mu) / sd; Xte = (Xte - mu) / sd
-    A = Xtr.T @ Xtr + lam * np.eye(Xtr.shape[1]); Wt = np.linalg.solve(A, Xtr.T @ (Ytr - Ytr.mean(0)))
-    pred = Xte @ Wt + Ytr.mean(0); return r2(pred, Yte), pred
+    pred = ridge_fit_predict(Xtr, Ytr, Xte, lam); return r2(pred, Yte), pred   # primal or dual form, same solution (wm2cx/probes.py)
 
 
 def mlp_r2(Xtr, Ytr, Xte, Yte, lam=None, hidden=256, epochs=30):
