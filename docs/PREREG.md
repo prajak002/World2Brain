@@ -162,3 +162,33 @@ nothing in sections 1-7 or Amendment 1; H1-H6 and their Holm family are untouche
 7. **Claim allowed.** H7a + H7c pass: "silencing the central complex of the distilled whole-brain student impairs
    object-vector memory more than matched random lesions, and only with the real wiring". Otherwise the lesion table is
    reported as a negative.
+
+### Amendment 3 — 2026-11-11 14:05 UTC, learning rate of the whole-brain students on Memory Maze (no eval trajectory used)
+**What happened.** B4 was launched at the Amendment-1 learning rates. The GRU trained normally (G seeds 0 and 1 finished;
+validation blind MSE 0.408 at update 12,000). The whole-brain students diverged during the 1,000-update warmup, the
+training loss rising with the learning rate: C seed 0 1.38 (update 200, lr 2e-4) -> 2.34 -> 2.65 -> 3.38 (update 800,
+lr 7.9e-4); S seed 0 1.68 -> 2.77 -> 7.09 -> 8.88 -> 19.4 (update 1,000) -> 39.3; S seed 1 80.6 at update 1,100. A loss
+above about 1.0 is worse than the constant predictor in this whitened space. The five runs (C s0-2, S s0-1) were stopped
+at updates 600-1,100, before their first validation point and before any checkpoint, probe or eval-set computation. Logs
+are kept in `logs/b4_lr1e-3_diverged_2026-11-11/`. Amendment 1 item 5 ("no further hyper-parameter search") cannot stand:
+1e-3 was validated on the 24-step in-house episodes, not on 1,001-step trajectories with carried state.
+
+**Change (registered before any of the runs below is started).**
+1. **Selection on validation only.** For the connectome family the learning rate is chosen from {1e-4, 2e-4, 3e-4, 5e-4}
+   with condition C (real wiring), seed 0, `--updates 1500` (1,000 warmup + cosine to 1,500), run names
+   `C_s0_lrsel<lr>`. The selected value is the one with the lowest validation blind MSE at update 1,500 (250 validation
+   trajectories, the Amendment-1 validation computation); a run whose training loss exceeds 1.0 at update 1,000 counts as
+   diverged and cannot be selected; ties (within 1 %) go to the lower rate. The eval trajectories are not read.
+2. **One value for the whole family.** The selected rate is used for C, S, B and R alike (it is selected on the real
+   wiring only, so the controls are not tuned individually; if this favours anyone it favours C, and the paper says so).
+   Warmup, schedule, budget U = 12,000, batch, clipping and the checkpoint rule are unchanged.
+3. **Same opportunity for the GRU.** G seed 0 is run under the same protocol on {5e-4, 1e-3, 2e-3, 4e-3}
+   (`G_s0_lrsel<lr>`). If 2e-3 is selected the finished G runs stand. Otherwise all G seeds are rerun at the selected
+   rate under the canonical names and the 2e-3 runs are kept as a separately labelled condition `G_lr2e-3`.
+4. **Transformer.** T keeps 1e-3 unless its seed-0 run diverges by the criterion of item 1, in which case T seed 0 is
+   run under the same protocol on {1e-4, 2e-4, 3e-4, 5e-4}.
+5. **If every rate in the family grid diverges**, B4 for C/S/B/R is reported as failed (H1-H5, H7 "not testable: the
+   whole-brain student could not be trained on Memory Maze at this budget") and no further search is done before the
+   deadline.
+6. **Reporting.** The diverged 1e-3 attempt and the selection runs are reported in the paper's supplement with their
+   losses. Hypotheses H1-H7, metrics, seeds, statistics and the probe protocol are unchanged.
