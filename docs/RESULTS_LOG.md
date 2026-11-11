@@ -70,3 +70,41 @@ Template:
   3. The waves run in parallel instead of in sequence: wave 1 (C, G) on GPU 1 with JOBS=3, waves 2-3 (S, B, R, T) on
      GPU 0 with JOBS=2, because one connectome-family run takes about 10 h at this concurrency. G seed 0 finished in the
      first attempt after the fix and is kept (checkpoint rule chose update 12,000).
+
+## 2026-11-11 batch-A-heading — whole-brain heading / position probes complete (H6, secondary)
+- commit: probes 95c8aa0 (`exp/batchA-2026-11-11`)          box: Vast 60172952, GPU 0          wall time: 13:05-18:00 UTC
+- command: `CUDA_VISIBLE_DEVICES=0 P=2 OMP=4 STAGES="hd homing blackout" bash scripts/run_l4_full.sh`
+- prereg items: H6 heading part. Ridge probe on all units, 8 dark steps, arena, mean +- sd over 3 seeds (no per-episode
+  errors are stored by `eval_hd.py`, so no paired test; per-seed values given):
+  * connectome 11.1 +- 1.8 deg (9.8, 13.1, 10.4), position R^2 0.92; block-shuffled 14.1 +- 0.9 (13.1, 14.7, 14.5);
+    random 14.3 +- 0.5; degree-shuffled 14.6 +- 0.4; GRU 33.1 +- 1.2; transformer 41.7 +- 1.2.
+  * 16 dark steps (8:24): connectome 20.4 +- 2.4 (17.8, 22.5, 20.8); rewired 27.2-28.4 (every seed 26.0-28.9);
+    GRU 39.7; transformer 55.4. Continuous turns, 8 steps: 16.7 / 18.2-18.8 / 34.3 / 41.6.
+  * -> the whole-brain connectome beats GRU and transformer on every seed (PASS for "sparse wiring holds heading");
+    against the rewired brains it is ahead on the mean at 8 steps (seed 1 ties block-shuffled seed 0 at 13.1) and on
+    every seed at 16 steps.
+  * NEGATIVE / caution: with a random 3,302-unit subset (the GRU's width) the connectome reads 27.0 +- 0.4 deg, better
+    than the GRU (33.1) but WORSE than the rewired brains' subsets (20.7-24.9). The full-state code is concentrated: CX
+    alone (2,875 units) gives 10.3 deg in connectome seed 0 and 13.1 in block-shuffled seed 0 (actions enter CX).
+  * The MLP probe on all 139,248 units does not fit for any sparse wiring (heading 50-66 deg, R^2 about 0).
+- outputs: `results/hd/*_full*.json` (108)          logs: box `logs/h200_full_evals2.log`
+- failures / deviations: (1) whole-brain homing with the linear readout failed for all 18 sparse runs:
+  `eval_homing.py` builds the 139,248^2 normal equations on the GPU (72 GB) while Memory Maze trainings occupy it; only
+  the GRU / transformer homing files exist (8). Needs the dual form and a free GPU; not rerun yet. (2) The blackout
+  stage was not run (GPU occupied); the evaluation session was stopped at 18:26 UTC. (3) TO CHECK: `eval_homing.py`
+  forms its Gram matrix on the GPU in float32 while the pipelines export TORCH_ALLOW_TF32_CUBLAS_OVERRIDE=1; the
+  circuit-scale homing numbers already in the paper may carry TF32 error in the readout. Not yet tested.
+
+## 2026-11-11 B4 — Memory Maze training: stopped once in error, relaunched at the registered settings
+- commit: PREREG Amendment 3 2d8e3a2, Amendment 4 e2fad64          box: Vast 60172952, both GPUs
+- what happened: at 13:58 UTC I stopped C s0-2 and S s0-1 at updates 600-1,100 because their training loss was rising
+  through warmup (C 1.38 -> 3.38; S up to 80.6), and registered a learning-rate selection (Amendment 3). The selection
+  runs (C seed 0: validation blind MSE 0.972 / 0.956 / 0.951 / 0.934 at nominal 1e-4 / 2e-4 / 3e-4 / 5e-4; G seed 0:
+  0.631 / 0.582 / 0.538 / 0.512 at 5e-4 / 1e-3 / 2e-3 / 4e-3; 1,500 updates) showed no benefit from a lower rate, and
+  the batch-A logs show the same early loss transient recovering in the in-house whole-brain runs. Amendment 4
+  rescinds Amendment 3: the stop was premature. Cost: about 5 h of both GPUs (3 h of it idle after the selection runs).
+- command (relaunch 18:21 UTC, identical to Amendment 1): `/root/mm_g1.sh` (wave 1 on GPU 1, JOBS=3), `/root/mm_g0.sh`
+  (waves 2-3 on GPU 0, JOBS=2), `/root/mm_side.sh` (labelled side conditions `C_s0_lr2e-4`, `G_s{0,1,2}_lr4e-3`)
+- prereg items: none yet; no eval trajectory has been read by any trained model
+- outputs: `results/memmaze/runs/{G_s0,G_s1}.json` (registered runs), `*_lrsel*.json` (selection runs)
+  logs: box `logs/b4_lr1e-3_diverged_2026-11-11/`, `logs/lrsel_2026-11-11/`, `logs/b4_*.log`
