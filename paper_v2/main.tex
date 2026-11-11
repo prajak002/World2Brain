@@ -317,8 +317,8 @@
 \def\confName{CVPR}
 \def\confYear{2027}
 
-\title{Distilling a Video World Model into the \emph{Drosophila} Connectome:\\
-What a Real Wiring Diagram Buys a Latent Predictor}
+\title{Connectome-Wired World Models:\\
+Distilling a Video World Model into the \emph{Drosophila} Brain}
 
 \author{Anonymous CVPR submission\\
 Paper ID *****
@@ -328,27 +328,21 @@ Paper ID *****
 \maketitle
 % ================= sec/0_abstract.tex =================
 \begin{abstract}
-\noindent\textbf{Bigger Picture.} The release of the complete adult \emph{Drosophila} connectome has sparked
-excitement across the AI community, with researchers reporting promising results from drone control to language
-modelling. At this point, a fundamental question arises: can biological wiring offer an advantage in learning to
-navigate the world? We investigate this by distilling representations from \vjepa, a state-of-the-art world model,
-and testing real versus artificial wiring in spatial memory and navigation.
-\textbf{What We Did.} We take three steps: (i) \emph{Connectome-Constrained Distillation:} distil \vjepa\ 2.1
-representations into a synapse-constrained recurrent network with 6,935 \flywire\ neurons and 91,663 signed
-synapses; (ii) \emph{Learning Without Navigation Supervision:} train only on next-latent prediction during visual
-blackouts, without heading, position, or navigation supervision; (iii) \emph{Rigorous Evaluation:} compare six
-wiring controls, dense recurrence, and parameter-matched GRU and transformer baselines in synthetic and Manhattan
-environments.
-\textbf{What We Found.} Three findings emerge: (i) \emph{Prediction is not memory:} the GRU achieves
-\nGruBetterArena\% lower MSE (\nGruArenaMse\ vs.\ \nConnArenaMse), but the connectome retains heading
-(\nConnArenaHd\degree\ vs.\ \nGruArenaHd\degree\ error) and position ($R^2=\nConnArenaPos$ vs.\ \nGruArenaPos) after
-eight blind steps. (ii) \emph{Memory survives darkness:} this advantage persists over 16--20 blind steps, continuous
-turns, and Manhattan simulations, and with a small policy head the connectome walks back to its start after 24--30
-dark steps with success \nBkConnArenaTw--\nBkConnArenaTh\ against \nBkGruArenaTw--\nBkGruArenaTh\ for the GRU.
-(iii) \emph{Wiring matters, but sparsity matters more:} random and shuffled graphs also develop spatial memory; real
-wiring improves heading by \nConnBlockGapArena--\nConnBlockGapArenaDarkSixteen\degree\ over block-shuffled controls,
-while coupling additional connectome copies brings no gain. Our conclusion: real wiring modestly improves spatial
-memory but offers no consistent navigation advantage over artificial wiring.
+The complete synaptic wiring diagram of an adult brain is now public, yet nobody knows whether such wiring is a useful
+architecture for a learned world model. We introduce the \emph{connectome-wired world model}: the latent dynamics of a
+video foundation model, \vjepa, are distilled into a recurrent network whose only recurrent connections are the signed
+synapses of the proofread \flywire\ \emph{Drosophila} connectome, first on a 6,935-neuron navigation circuit and then on
+the whole brain of 139,248 neurons and 2.7 million synapses. The model is trained on one objective, next-latent
+prediction under random visual blackouts, with no heading, position or navigation supervision. We compare it with
+degree-shuffled, block-shuffled and random wirings of identical size and sign structure, and with parameter-matched
+GRU, LSTM and transformer world models, over multiple seeds with paired statistics. The dense baselines predict the
+latent better (the GRU by \nGruBetterArena\,\%), yet the connectome-wired model forms a path-integrating state that
+they do not: after eight steps in darkness its state gives heading to \nConnArenaHd\degree\ and position to
+$R^2=\nConnArenaPos$, against \nGruArenaHd\degree\ and \nGruArenaPos\ for the GRU. The code survives 16 to 20 dark
+steps, continuous turn angles and a twin of Manhattan, and with a small policy head the agent walks home after 24 to 30
+dark steps in \nBkConnArenaTw--\nBkConnArenaTh\ of episodes against \nBkGruArenaTw--\nBkGruArenaTh\ for the GRU. Real
+wiring adds a small, consistent gain over shuffled wiring. A pre-registered whole-brain evaluation on Memory Maze with
+in-silico circuit lesions is specified. Code, environments and checkpoints are released.
 \end{abstract}
 % ================= sec/1_intro.tex =================
 \section{Introduction}
@@ -400,11 +394,22 @@ leave the wiring unconstrained. Latent-regression distillation from a frozen vid
 DINO-WM~\cite{zhou2024dinowm} and JEPA world models~\cite{assran2025vjepa2}) is the one setting in which the student's
 recurrence can be fixed to a biological graph while the target stays a strong, general, self-supervised representation.
 
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig/tradeoff.pdf}
+  \caption{\textbf{Prediction is not memory.} Every network is trained on the same next-latent objective and plotted
+  by how well it predicts through a blackout (x) and how well its state still knows the heading after 8 dark steps (y).
+  Free recurrences (blue) predict best and forget where they are facing. Sparse signed graphs (orange) hold heading to
+  about 10\degree; the real connectome ($\star$) is the best of them. Filled markers: 5 seeds; hollow markers: 3 seeds
+  from the second batch (\cref{sec:newbase}).}
+  \label{fig:tradeoff}
+\end{figure}
+
 \paragraph{What we find}
-The answer has two halves, and we state both plainly. The wiring is \emph{not} a better predictor: against controls that
+The answer has two halves (\cref{fig:tradeoff}), and we state both plainly. The wiring is \emph{not} a better predictor: against controls that
 hold neuron count, edge count, region block structure, Dale's-law signs and parameter count fixed, the real connectome
 beats its shuffled twins by about one percent of latent error, consistently, while a parameter-matched GRU is
-\nGruBetterArena\,\% better. What the wiring buys is a \emph{path-integrating state} (\cref{fig:main}): during the blind
+\nGruBetterArena\,\% better. What the wiring buys is a \emph{path-integrating state} (\cref{fig:tradeoff}; bars with spreads in \supp{fig:main}): during the blind
 steps a ridge probe reads heading from the connectome state to \nConnArenaHd\degree\ median error and position to
 $R^2$\,\nConnArenaPos, where the better-predicting GRU gives \nGruArenaHd\degree\ and \nGruArenaPos. The code survives 16
 and 20 dark steps, reappears in a raycast twin of Manhattan, widens under a non-linear probe and persists under
@@ -414,32 +419,25 @@ blind return at \nBkConnArenaTw\ to \nBkConnArenaTh\ success over 24 to 30 dark 
 \nConnBlockGapArena\ to \nConnBlockGapArenaDarkSixteen\degree\ worse: the exact synapse list is a small reproducible
 bonus, not the cause.
 
-\begin{figure*}[t]
-  \centering
-  \includegraphics[width=\linewidth]{fig/ladder.pdf}
-  \caption{\textbf{The wiring makes a worse predictor and a better integrator} (arena, mean\pm sd over 5 seeds).
-  (a) Blind latent-prediction error: every free recurrence (blue) beats every fixed sparse graph (orange); the real
-  connectome (dark) beats its shuffled twins by about one percent. (b) Median heading error decoded from the state
-  during 8 dark steps: the ordering flips. Sparse signed graphs hold heading to about 10\degree, the GRUs to over
-  30\degree, against a 40\degree\ floor for a linear readout of the actions alone.}
-  \label{fig:main}
-\end{figure*}
-
 \paragraph{Contributions}
+To our knowledge this is the first world model whose recurrent core is a synapse-level wiring diagram of a real brain
+and whose teacher is a self-supervised video model. We summarise the contributions as follows.
 \begin{itemize}
-  \item A distillation recipe that turns a video foundation model into a world model whose recurrence is a fixed,
-        signed, biologically sourced sparse graph, with controls that separate wiring identity from density, degree
-        sequence, region structure and sign structure (\cref{sec:method}).
-  \item A single-versus-multiple-connectome study: $K$ copies of the brain coupled only through the 40,194 real
-        commissural synapses, showing that neuron count is not the limiting resource (\cref{sec:multi}).
-  \item The first demonstration, to our knowledge, that a connectome-wired latent predictor forms a linearly readable
-        heading and position code in the dark that neither a GRU nor a transformer trained on the same objective forms,
-        with information-ceiling, continuous-turn, feature-count and non-linearity controls (\cref{sec:probes}).
-  \item A behavioural test of that code (blind homing, goal-vector navigation) with oracle, dead-reckoning and random
-        controls, reported in full including the negative outcomes, plus real phone video as a third world
-        (\cref{sec:behaviour,sec:realvid}); with a policy head cloned from the agent's own dark rollouts, the state
-        supports blind return over 24 to 30 dark steps at about twice the GRU's success (\cref{sec:blackout}).
-  \item Two simulated environments, the real-video ingest pipeline, all code and checkpoints, released.
+  \item \textbf{A new student class.} A distillation recipe that turns a video foundation model into a world model whose
+        recurrence is a fixed, signed, biologically sourced sparse graph, from a 6,935-neuron circuit to the whole
+        139,248-neuron brain (\cref{sec:method,sec:scale}).
+  \item \textbf{A control ladder that isolates wiring.} Nine recurrent cores at one input, one readout and one loss
+        separate synapse identity from density, degree sequence, region structure and sign structure, next to
+        parameter-matched GRU, LSTM, transformer and graph-network students (\cref{sec:controls,sec:newbase}).
+  \item \textbf{An emergent path-integration code.} A connectome-wired latent predictor forms a linearly readable
+        heading and position code in the dark that no free recurrence trained on the same objective forms, checked with
+        information-ceiling, continuous-turn, feature-count and non-linearity controls (\cref{sec:probes}).
+  \item \textbf{Behaviour from the code.} With a policy head cloned from the agent's own dark rollouts the state
+        supports blind return over 24 to 30 dark steps at about twice the GRU's success (\cref{sec:blackout}); linear
+        homing, goal navigation and real phone video are reported in full, negative outcomes included
+        (\cref{sec:behaviour,sec:realvid}).
+  \item \textbf{A released benchmark.} Two simulated worlds, the real-video ingest pipeline, a pre-registered
+        Memory Maze protocol with circuit lesions, all code and checkpoints.
 \end{itemize}
 % ================= sec/2_related.tex =================
 \section{Prior work and where this paper sits}
@@ -546,7 +544,12 @@ style of IRIS, STORM and DINO-WM~\cite{micheli2023iris,zhang2023storm,zhou2024di
 model within the budget (4 layers, 3.44\,M); its state for every probe is the last token. Two further ablations test
 the input side: a \emph{cross-attention input encoder} (each VIS neuron owns a query over the fly-eye patches, 0.11\,M
 instead of 1.83\,M parameters) and a \emph{hybrid} that adds one attention layer over 796 cell-type-pooled tokens to
-the connectome recurrence. In a second copy of the arena data every turn is $22.5^\circ(1+\epsilon)$,
+the connectome recurrence. Three more students were added in a second batch (\cref{sec:newbase}): a unidirectional
+\textbf{LSTM}~\cite{hochreiter1997long} with 631 units (3.71\,M parameters); a \textbf{graph network} that passes
+messages along the connectome's edge list, keeps Dale's signs and shares its update function within each cell type; and
+the connectome student trained with two \emph{circuit-structured} auxiliary losses, a dead-reckoning loss on the CX
+neurons and a contrastive loss across the blackout (weight 0.1 each). In a second copy of the arena data every turn is
+$22.5^\circ(1+\epsilon)$,
 $\epsilon\sim\mathcal{N}(0,0.3)$, so heading is no longer a linear function of the action counts.
 
 \subsection{Benchmarks}
@@ -704,7 +707,7 @@ bottleneck (the oracle reaches 0.83); the readout is. Latent-cost MPC on the sam
 \label{sec:blackout}
 \begin{figure*}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig/blackout_success.pdf}
+  \includegraphics[width=0.84\linewidth]{fig/blackout_success.pdf}
   \caption{\textbf{Blind return as a function of blackout length.} The agent sees the arena for 12 steps, then vision is
   cut for $k$ steps and it must walk back to its start (success radius 2 units on the arena, 12\,m on the NYC twin),
   with continuous turn angles on the arena. Instead of a linear pose decoder feeding a hand-written controller, a
@@ -716,27 +719,6 @@ bottleneck (the oracle reaches 0.83); the readout is. Latent-cost MPC on the sam
   $k=24$ and $30$ (100 episodes); the dense recurrence collapses.}
   \label{fig:blackout}
 \end{figure*}
-\begin{table}[t]
-  \centering\footnotesize
-  \caption{\textbf{Blind return success} with the policy head, 100 episodes per cell (dense: 50), 95\,\% bootstrap interval.
-  Arena: continuous turns, 2 seeds pooled; NYC twin: seed 0.}
-  \label{tab:blackout}
-  \setlength{\tabcolsep}{3pt}\resizebox{\columnwidth}{!}{\begin{tabular}{lccc}
-    \toprule
-    & \multicolumn{2}{c}{Arena} & NYC twin \\
-    \cmidrule(lr){2-3}\cmidrule(lr){4-4}
-    state & $k=24$ & $k=30$ & $k=30$ \\
-    \midrule
-    oracle pose (ceiling) & 1.00 & 1.00 & 1.00 \\
-    dead reckoning of actions & 0.90 & 0.90 & 1.00 \\
-    random actions (floor) & 0.02 & 0.02 & 0.00 \\
-    \midrule
-    dense & 0.10 [0.02, 0.18] & 0.00 [0.00, 0.00] & -- \\
-    GRU (parameter-matched) & \nBkGruArenaTw\ [\nBkGruArenaTwLo, \nBkGruArenaTwHi] & \nBkGruArenaTh\ [\nBkGruArenaThLo, \nBkGruArenaThHi] & \nBkGruNycTh\ [\nBkGruNycThLo, \nBkGruNycThHi] \\
-    \textbf{connectome} & \textbf{\nBkConnArenaTw} [\nBkConnArenaTwLo, \nBkConnArenaTwHi] & \textbf{\nBkConnArenaTh} [\nBkConnArenaThLo, \nBkConnArenaThHi] & \textbf{\nBkConnNycTh} [\nBkConnNycThLo, \nBkConnNycThHi] \\
-    \bottomrule
-  \end{tabular}}
-\end{table}
 The homing numbers above are limited by their readout, not by the state: the oracle pose reaches 1.00 through the same
 controller, and \cref{sec:probes} shows that the state holds a position estimate the ridge decoder returns only
 coarsely. Success radius is 2 units here, matched to the NYC 12\,m / 3\,m ratio, and the oracle, dead-reckoning and random rows are
@@ -747,7 +729,7 @@ head learns to act on whatever the state encodes, and errors it makes early in t
 distribution. The recurrent network stays frozen; nothing about pose is supervised; the same head, data and budget are
 used for every wiring.
 
-\Cref{fig:blackout} and \cref{tab:blackout} give the result. With 24 dark steps the connectome returns home in
+\Cref{fig:blackout} gives the result (numbers in \supp{tab:blackout}). With 24 dark steps the connectome returns home in
 \nBkConnArenaTw\ of episodes against \nBkGruArenaTw\ for the parameter-matched GRU, and with 30 dark steps
 \nBkConnArenaTh\ against \nBkGruArenaTh; the bootstrap intervals do not overlap at either length, and the two
 connectome seeds (0.66 and 0.71 at $k=24$, 0.68 and 0.74 at $k=30$) both exceed the GRU's upper bound. The dense
@@ -766,15 +748,71 @@ probe is the informative row (\supp{fig:rvbars}): with the \emph{simulator-fit} 
 \nConnArenaRvTransferHd\degree\ and \nNosignArenaRvTransferHd\degree\ while the GRU, random and degree-shuffled states
 do not transfer at all (79 to 89\degree); with an in-domain readout every state decodes heading to 7 to 10\degree.
 
+\subsection{More baselines: LSTM, a graph network, structured losses}
+\label{sec:newbase}
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig/newbase.pdf}
+  \caption{\textbf{The finding holds against an LSTM and does not need a structured loss} (arena, 8 dark steps,
+  mean\pm sd over 3 seeds, second batch on regenerated data). The LSTM behaves like the GRU. Adding a dead-reckoning or
+  a contrastive loss to the connectome student changes nothing outside the seed spread. A graph network on the same
+  edge list holds heading best and predicts worst (numbers in \supp{tab:newbase}).}
+  \label{fig:newbase}
+\end{figure}
+A reader will ask three further questions, and a second batch answers them (\cref{fig:newbase}; \supp{tab:newbase};
+3 seeds, so we report means and spreads and claim only what the spreads separate). \emph{Is the GRU a weak
+baseline?} No: a parameter-matched LSTM predicts slightly worse than the GRU and holds heading no better
+(30.5\degree\ against 30.6\degree), so the gap to the connectome is a gap to gated dense recurrence in general.
+\emph{Does the code need the right loss?} No: a dead-reckoning loss on the central-complex neurons and a contrastive
+loss across the blackout leave prediction, heading and position where the plain objective put them: a negative
+result for structured objectives.
+\emph{Is the leaky rate unit essential?} No: a graph network that passes messages along the same synapses holds
+heading to 5.7\degree, the lowest error we measure, at the price of the worst and least stable prediction. With eight
+channels per neuron the graph network predicts as well as the rate student, and there the shuffled and random graphs
+predict \emph{better} than the real one, so the small real-wiring gain in prediction is specific to the rate student.
+
+\subsection{Scaling up: the whole brain and Memory Maze}
+\label{sec:scale}
+\begin{table}[t]
+  \centering\footnotesize
+  \caption{\textbf{From a circuit to the whole brain.} The same student equation on the navigation subgraph and on
+  every proofread neuron of \flywire\ v783. Baselines are re-matched to the whole-brain parameter count.}
+  \label{tab:scale}
+  \setlength{\tabcolsep}{4pt}\begin{tabular}{lcc}
+    \toprule
+    & circuit & whole brain \\
+    \midrule
+    neurons & 6,935 & 139,248 \\
+    signed edges ($\ge5$ synapses) & 91,663 & 2,700,429 \\
+    parameters & 3.71\,M & 41.39\,M \\
+    GRU hidden units at equal parameters & 762 & 3,308 \\
+    transformer at equal parameters & 4 layers & 13 layers, width 512 \\
+    Memory Maze steps (train / eval) & -- & 10.6\,M / 1.0\,M \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+Nothing in \cref{eq:student} depends on the size of the graph, so the same student runs on every proofread neuron of
+the fly brain (\cref{tab:scale}). At this size a dense control is no longer possible ($139{,}248^2$ weights), and the
+GRU and transformer are re-matched to 41.4\,M parameters. We evaluate the whole-brain student in two ways, both
+registered before any run. (i) The in-house benchmarks of this section, with degree-shuffled, block-shuffled and random
+whole-brain graphs, a GRU and a transformer, three seeds each. (ii) Memory Maze~\cite{pasukonis2023memmaze}, an
+external long-term memory benchmark, under its published offline-probing protocol: the students predict \vjepa\ latents
+along 1,000-step trajectories of the $9\times9$ maze, and a frozen-state probe is scored on wall layout and object
+vectors over steps 500 to 1,000, next to the published baselines. Because the state is a set of named neurons, we add a
+test no free recurrence allows: \emph{in-silico lesions}. The registered hypothesis is that silencing the central
+complex hurts object-vector memory more than silencing a random set matched in size and out-degree, more than silencing
+the mushroom body, and only in the real wiring. These runs are pre-registered and were unfinished at submission; we
+make no claim from them.
+
 \subsection{What is outperformed, and what is not}
 \label{sec:scorecard}
 \begin{table}[t]
   \centering\footnotesize
   \caption{\textbf{Scorecard.} Does the connectome beat each baseline on each benchmark? \checkmark\ yes (5 seeds,
   paired $p<0.01$; blind return: non-overlapping 95\,\% bootstrap intervals over 50--100 episodes); $\approx$ within seed noise;
-  $\times$ no; -- not run.}
+  $\times$ no; -- not run. $^\dagger$3 seeds, no paired test; the seed spreads do not overlap (\supp{tab:newbase}).}
   \label{tab:score}
-  \setlength{\tabcolsep}{3pt}\begin{tabular}{lccccc}
+  \setlength{\tabcolsep}{3pt}\resizebox{\columnwidth}{!}{\begin{tabular}{lccccc}
     \toprule
     baseline & MSE & heading & homing & blind return & real-video \\
     \midrule
@@ -787,19 +825,14 @@ do not transfer at all (79 to 89\degree); with an in-domain readout every state 
     GRU (param-matched) & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark \\
     GRU (recurrent-matched) & $\times$ & \checkmark & \checkmark & -- & -- \\
     transformer & $\times$ & \checkmark & -- & -- & -- \\
+    LSTM$^\dagger$ & $\times$ & \checkmark & -- & -- & -- \\
     \bottomrule
-  \end{tabular}
+  \end{tabular}}
 \end{table}
 \Cref{tab:score} condenses the paper. The connectome beats every \emph{wiring} control on prediction and on the dark
 heading code. It loses prediction to every \emph{free} recurrence, wins the dark heading code against all of them, and
 with a policy head turns that code into blind return that neither the GRU nor the dense network matches.
 
-\subsection{Cost, scaling and ablation}
-\label{sec:more}
-One connectome step costs 7.4\,MFLOP, the same as the parameter-matched GRU, with 91,663 recurrent weights against
-the GRU's 580,644; dense costs 103\,MFLOP. With the synapse threshold at 1, 5 or 10, with MB or OUT removed, or with CX
-alone, the real wiring beats its degree-shuffled twin by 0.02 to 0.04 MSE (\cref{sec:ablation}); no single region
-carries the margin.
 % ================= sec/5_discussion.tex =================
 \section{Discussion}
 \label{sec:novelty}
@@ -827,13 +860,10 @@ fly's version is a little better'' is the paper. A mechanistic hypothesis is giv
 (i) Blind return with the policy head uses two connectome seeds and one seed for the GRU, dense and NYC rows; shuffled
 wirings and the transformer are pre-registered but not yet run under this readout. (ii) Actions are given to the student in the dark.
 (iii) The environments are synthetic, and on real video no student beats copy-last zero-shot. (iv) The teacher is
-ViT-B at 256\,px and the NYC twin is one location. (v) The EPG population does not carry the heading code; the
+ViT-B at 256\,px and the NYC twin is one location. (v) The LSTM, graph-network and structured-loss rows use 3 seeds, and the whole-brain and Memory Maze evaluations
+of \cref{sec:scale} are registered but unfinished. (vi) The EPG population does not carry the heading code; the
 biological ring attractor does not emerge at this scale and we do not claim it.
 
-\paragraph{Broader impact}
-The \flywire connectome is CC-BY-NC~4.0; our derived graph is rebuilt by one script, not redistributed, and no human
-data are used. The lesson is that biological wiring is a structural prior to be tested with matched controls, not a
-blueprint to be copied.
 \section{Conclusion}
 A video foundation model can be distilled into a world model whose recurrence is the fly's wiring diagram. The wiring
 makes it a worse predictor and a better integrator: the state keeps a readable heading and position through the dark
@@ -860,6 +890,61 @@ integral around. The probes on random and shuffled sparse graphs fit this pictur
 
 \subsection{Additional figures and tables}
 \label{sec:suppl-floats}
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig/ladder.pdf}
+  \caption{\textbf{The wiring makes a worse predictor and a better integrator} (arena, mean\pm sd over 5 seeds).
+  (a) Blind latent-prediction error: every free recurrence (blue) beats every fixed sparse graph (orange); the real
+  connectome (dark) beats its shuffled twins by about one percent. (b) Median heading error decoded from the state
+  during 8 dark steps: the ordering flips. Sparse signed graphs hold heading to about 10\degree, the GRUs to over
+  30\degree, against a 40\degree\ floor for a linear readout of the actions alone.}
+  \label{fig:main}
+\end{figure*}
+\begin{table}[t]
+  \centering\footnotesize
+  \caption{\textbf{Blind return success} with the policy head, 100 episodes per cell (dense: 50), 95\,\% bootstrap interval.
+  Arena: continuous turns, 2 seeds pooled; NYC twin: seed 0.}
+  \label{tab:blackout}
+  \setlength{\tabcolsep}{3pt}\resizebox{\columnwidth}{!}{\begin{tabular}{lccc}
+    \toprule
+    & \multicolumn{2}{c}{Arena} & NYC twin \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-4}
+    state & $k=24$ & $k=30$ & $k=30$ \\
+    \midrule
+    oracle pose (ceiling) & 1.00 & 1.00 & 1.00 \\
+    dead reckoning of actions & 0.90 & 0.90 & 1.00 \\
+    random actions (floor) & 0.02 & 0.02 & 0.00 \\
+    \midrule
+    dense & 0.10 [0.02, 0.18] & 0.00 [0.00, 0.00] & -- \\
+    GRU (parameter-matched) & \nBkGruArenaTw\ [\nBkGruArenaTwLo, \nBkGruArenaTwHi] & \nBkGruArenaTh\ [\nBkGruArenaThLo, \nBkGruArenaThHi] & \nBkGruNycTh\ [\nBkGruNycThLo, \nBkGruNycThHi] \\
+    \textbf{connectome} & \textbf{\nBkConnArenaTw} [\nBkConnArenaTwLo, \nBkConnArenaTwHi] & \textbf{\nBkConnArenaTh} [\nBkConnArenaThLo, \nBkConnArenaThHi] & \textbf{\nBkConnNycTh} [\nBkConnNycThLo, \nBkConnNycThHi] \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
+\begin{table}[t]
+  \centering\footnotesize
+  \caption{\textbf{Second batch} (arena, 3 seeds, mean\pm sd; all rows within 0.4\,\% of 3.71\,M parameters). The three
+  anchor rows reproduce \cref{tab:pred,tab:probe} on regenerated data. --: the 55k-column state of the 8-channel graph
+  network does not fit the ridge probe and was not probed.}
+  \label{tab:newbase}
+  \setlength{\tabcolsep}{3pt}\resizebox{\columnwidth}{!}{\begin{tabular}{lccc}
+    \toprule
+    student & MSE $\downarrow$ & heading err $\downarrow$ & pos $R^2$ $\uparrow$ \\
+    \midrule
+    GRU (anchor) & \textbf{0.434\pm0.002} & 30.6\pm1.2 & 0.42\pm0.01 \\
+    LSTM & 0.460\pm0.006 & 30.5\pm0.4 & 0.37\pm0.01 \\
+    block-shuffled (anchor) & 0.588\pm0.004 & 10.5\pm0.6 & 0.93\pm0.01 \\
+    \textbf{connectome} (anchor) & 0.579\pm0.001 & 8.5\pm1.5 & 0.95\pm0.01 \\
+    \quad + dead-reckoning loss & 0.576\pm0.003 & 8.8\pm1.6 & 0.95\pm0.01 \\
+    \quad + contrastive loss & 0.578\pm0.001 & 8.3\pm1.2 & 0.95\pm0.01 \\
+    \midrule
+    graph net, 1 channel, connectome & 0.665\pm0.110 & \textbf{5.7\pm0.7} & \textbf{0.96\pm0.01} \\
+    graph net, 8 channels, connectome & 0.575\pm0.004 & -- & -- \\
+    graph net, 8 channels, block-shuffled & 0.536\pm0.009 & -- & -- \\
+    graph net, 8 channels, random & 0.524\pm0.003 & -- & -- \\
+    \bottomrule
+  \end{tabular}}
+\end{table}
 \Cref{fig:envs} shows the three worlds and \cref{fig:activity} the student's state on one episode; \cref{tab:suppl-dark-nyc,tab:data} extend the NYC dark-duration and data-efficiency results.
 Figures and tables referenced from the main text as ``in the supplement''.
 \begin{figure}[t]
@@ -1225,6 +1310,18 @@ rest stay. The heading target of the probe is the integrated continuous yaw, not
 ``actions only'' floor and the probe measure different things on this data. Zero-shot, fine-tuned and probe numbers for
 every architecture are in \cref{tab:realvid}; per-clip numbers are in \texttt{results/summary.md}.
 
+\subsection{Cost, scaling and ablation}
+\label{sec:more}
+One connectome step costs 7.4\,MFLOP, the same as the parameter-matched GRU, with 91,663 recurrent weights against
+the GRU's 580,644; dense costs 103\,MFLOP. With the synapse threshold at 1, 5 or 10, with MB or OUT removed, or with CX
+alone, the real wiring beats its degree-shuffled twin by 0.02 to 0.04 MSE (\cref{sec:ablation}); no single region
+carries the margin.
+
+\paragraph{Broader impact}
+The \flywire connectome is CC-BY-NC~4.0; our derived graph is rebuilt by one script, not redistributed, and no human
+data are used. The lesson is that biological wiring is a structural prior to be tested with matched controls, not a
+blueprint to be copied.
+
 \subsection{Teacher-free planning (negative)}
 \label{sec:suppl-plan}
 Latent CEM-MPC with the student as dynamics model succeeds in 0 to 3\,\% of arena navigation episodes for every
@@ -1243,6 +1340,7 @@ phone clip with both students fine-tuned on the other clips.
 
 \subsection{Reproducibility}
 All results in the paper come from one run on a single RTX 4090 (about 14 GPU-hours): 5 seeds on the arena, 3 on NYC,
-12 wirings, 424 checkpoints. Code, environments, the ingest pipeline for phone video, and the checkpoints are released;
+12 wirings, 424 checkpoints; the second batch (\cref{tab:newbase}; LSTM, graph network, structured losses, 3 seeds)
+ran on a free cloud GPU on regenerated arena data and carries its own anchor rows. Code, environments, the ingest pipeline for phone video, and the checkpoints are released;
 the \flywire-derived connectome file is rebuilt by one script from the public v783 release.
 \end{document}

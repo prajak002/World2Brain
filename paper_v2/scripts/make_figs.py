@@ -57,3 +57,35 @@ ax.axhline(90, color="k", lw=.5, ls="--"); ax.text(-0.4, 92, "chance (90 deg)", 
 ax.set_xticks(x); ax.set_xticklabels(w, rotation=25, ha="right"); ax.set_ylabel("heading error, deg"); ax.set_ylim(0, 125)
 ax.legend(fontsize=6, frameon=False, loc="upper left"); fig.tight_layout(); fig.savefig(out / "realvid_bars.pdf"); plt.close(fig)
 print("wrote", [p.name for p in out.glob("*.pdf")])
+
+# 6. prediction-versus-memory plane (arena; numbers = tab:pred / tab:probe, 5 seeds; hollow = 3-seed Kaggle batch, tab:newbase)
+GN = "#2E8B57"
+pts = [  # name, blind MSE, heading err, colour, marker, filled, label offset (points)
+    ("GRU", 0.435, 30.3, FR, "o", True, (-6, 6)), ("Transformer", 0.502, 34.3, FR, "o", True, (5, -8)),
+    ("GRU (recurrent-matched)", 0.501, 35.5, FR, "o", True, (-4, 5)), ("LSTM", 0.460, 30.5, FR, "s", False, (5, -8)),
+    ("dense", 0.562, 21.3, "#7BAAF7", "o", True, (-27, 3)), ("unsigned", 0.573, 13.8, SP, "o", True, (-41, 2)),
+    ("random (ER)", 0.583, 12.8, SP, "o", True, (2, 7)), ("degree-shuffled", 0.610, 12.7, SP, "o", True, (5, -3)),
+    ("block-shuffled", 0.585, 10.9, SP, "o", True, (6, -9)), ("connectome (ours)", 0.579, 9.4, CX, "*", True, (-80, -9)),
+    ("graph network", 0.665, 5.7, GN, "s", False, (-50, -11))]
+fig, ax = plt.subplots(figsize=(3.4, 2.75))
+for nm, x, yv, c, m, fill, off in pts:
+    ax.scatter([x], [yv], s=(95 if m == "*" else 26), marker=m, facecolors=(c if fill else "none"), edgecolors=c, linewidths=1.1, zorder=3)
+    ax.annotate(nm, (x, yv), xytext=off, textcoords="offset points", fontsize=6.3, color=("k" if c != CX else CX),
+                fontweight=("bold" if c == CX else "normal"))
+ax.axhline(40.1, color="k", lw=.6, ls="--"); ax.text(0.425, 41.0, "linear readout of the actions alone", fontsize=6)
+ax.axhspan(0, 16, color=SP, alpha=0.07, lw=0); ax.text(0.427, 1.2, "holds heading in the dark", fontsize=6.3, color=CX, style="italic")
+ax.set_xlim(0.42, 0.70); ax.set_ylim(0, 45)
+ax.set_xlabel(r"blind latent MSE  ($\leftarrow$ better predictor)"); ax.set_ylabel("heading error after 8 dark steps, deg\n" + r"($\downarrow$ better memory)")
+ax.tick_params(length=2); fig.tight_layout(); fig.savefig(out / "tradeoff.pdf"); plt.close(fig)
+
+# 7. extra baselines and objectives (3 seeds, regenerated arena data; results/kaggle_small_a, results/kaggle_small_gnn)
+lab = ["GRU", "LSTM", "block-shuffled", "connectome", "  + dead-reckoning loss", "  + contrastive loss", "graph network (d=1)"]
+h = [30.6, 30.5, 10.5, 8.5, 8.8, 8.3, 5.7]; he = [1.2, 0.4, 0.6, 1.5, 1.6, 1.2, 0.7]
+r2 = [0.42, 0.37, 0.93, 0.945, 0.946, 0.945, 0.963]; r2e = [0.006, 0.007, 0.008, 0.007, 0.007, 0.005, 0.007]; cc = [FR, FR, SP, CX, CX, CX, GN]
+fig, ax = plt.subplots(1, 2, figsize=(3.4, 1.75), sharey=True); y = np.arange(len(lab))[::-1]
+ax[0].barh(y, h, xerr=he, color=cc, height=0.7, error_kw=dict(lw=.7)); ax[0].set_xlabel(r"heading error, deg  $\downarrow$", fontsize=6.5)
+ax[1].barh(y, r2, xerr=r2e, color=cc, height=0.7, error_kw=dict(lw=.7)); ax[1].set_xlabel(r"position $R^2$  $\uparrow$", fontsize=6.5); ax[1].set_xlim(0, 1.05)
+ax[0].set_yticks(y); ax[0].set_yticklabels(lab, fontsize=6.5)
+for a in ax: a.tick_params(length=2, labelsize=6.5)
+fig.tight_layout(); fig.savefig(out / "newbase.pdf"); plt.close(fig)
+print("wrote tradeoff.pdf, newbase.pdf")
