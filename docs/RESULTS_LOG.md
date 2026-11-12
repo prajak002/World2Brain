@@ -138,3 +138,41 @@ the circuit homing numbers themselves have not been re-run; that check is still 
 `connectome_K1_s0_full`: readout R2 0.80-0.91 on the fit set, success 0.06, final distance 2.23 (GRU s0: 0.06, 3.26). Two
 failed attempts before it (GPU and then host memory at 58,800 fit samples; logs `logs/hom_f64.log`, `logs/hom_f64_b.log`).
 No claim until all seeds and wirings are in. The Blackout stage at whole-brain size has not been started.
+
+## 2026-11-12 batch-A-homing — whole-brain linear-readout homing complete (H6, secondary); Blackout stage started
+
+- commit: readout a55f182 / 7a625a7; statistics `scripts/full_brain_homing_stats.py` (this commit)
+  box: Vast 60172952, GPU 0 (shared with Memory Maze training)          wall time: 2026-11-11 20:40 - 2026-11-12 03:55 UTC
+- command: `/root/hom2.sh` (tmux `hom`; `eval_homing.py --readout state`, 12 visible + 24 dark steps, 50 episodes,
+  300 fit rollouts, one run at a time), then `PYTHONPATH=. python scripts/full_brain_homing_stats.py`
+- prereg items: H6 homing part. 3 seeds, paired bootstrap over the 50 shared episodes (seeds averaged per episode), Holm
+  over 5 comparisons per metric and task (`results/full_brain_homing_summary.md`). Start distance 3.89 (arena).
+  * final distance to the start, arena: connectome 2.27; degree-shuffled 2.24, block-shuffled 2.09, random 2.26
+    (all "no difference": -0.03 [-0.25, +0.19], -0.18 [-0.39, +0.03], -0.01 [-0.27, +0.25]); GRU 3.47
+    (+1.20 [+0.85, +1.57]) and transformer 4.48 (+2.21 [+1.76, +2.68]) worse, Holm p = 0.0005.
+  * decoded-position drift at the end of the blackout, arena: connectome 2.75; degree-shuffled 4.43
+    (+1.67 [+1.25, +2.11]), block-shuffled 3.95 (+1.19 [+0.79, +1.60]), random 3.12 (+0.37 [+0.03, +0.71], Holm
+    p = 0.035), GRU 3.58, transformer 4.31: all worse than the connectome.
+  * success within radius 1.0 is low for every model: connectome 0.07 (0.06, 0.12, 0.04), rewired 0.11-0.19,
+    GRU 0.05, transformer 0.01. Continuous turns: the same pattern (connectome 0.16, rewired 0.11-0.15; final distance
+    no difference to any rewired brain; drift lowest for the connectome, all Holm p = 0.0005).
+  * -> PASS for "sparse wiring homes better than GRU / transformer" (final distance and drift).
+    NEGATIVE for real wiring against rewired wiring on behaviour: final distance is not different and success is not
+    higher (arena: lower on the mean). Only the decoded-position drift favours the real wiring.
+- outputs: `results/homing/*_full_arena_state.json`, `results/homing/*_full_tn_arena_state_tn.json` (36),
+  `results/full_brain_homing_summary.{md,json}`          logs: box `logs/hom_f64_c.log`
+- failures / deviations: none in this stage beyond the two memory failures already logged on 2026-11-11.
+
+**Whole-brain Blackout stage (started 07:12 UTC, tmux `bk`, `/root/bk.sh`, GPU 1 next to Memory Maze wave 1).** The
+variables of `run_l4_full.sh` line 80 with `ENVS=arena TASKS="t1 t3"`: 213 jobs (Return at k = 8, 16, 24, 30, 40 with
+the policy and state readouts, and open-loop Re-entry). NOT RUN: T2 (goal navigation), because `eval_goalnav.py` still
+builds the 139,248^2 primal normal equations for the state readout; and the NYC world, which has no whole-brain
+checkpoints on this box. No result yet.
+
+**Memory Maze B4 status (07:10 UTC).** Registered runs finished: C s0-2, G s0-4, S s0-1 (10 of 22); training: C s3,
+C s4, S s2, B s0 (updates 1,000-1,700 of 12,000, about 7 h each); queued: B s1-2, R s0-2, T s0-2. Side conditions
+`C_s0_lr2e-4` and `G_s{0,1,2}_lr4e-3` finished. Run JSONs pulled into `results/memmaze/runs/`; no probe, lesion or
+statistics stage has been run, so there is no H1-H7 result.
+
+**Paper.** `paper/cvpr-polish-2026-11-11` f3ed226: the whole-brain table and text carry the homing result, including
+the negative against the rewired brains; body is 8 pages.
