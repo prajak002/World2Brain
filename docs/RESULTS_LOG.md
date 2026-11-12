@@ -176,3 +176,22 @@ statistics stage has been run, so there is no H1-H7 result.
 
 **Paper.** `paper/cvpr-polish-2026-11-11` f3ed226: the whole-brain table and text carry the homing result, including
 the negative against the rewired brains; body is 8 pages.
+
+## 2026-11-12 (07:12-08:25 UTC) — whole-brain Blackout stage: state-readout jobs failed in the Cholesky solve; relaunched
+
+- commit: code 7a625a7 (unchanged)          box: Vast 60172952, GPU 1          command: `/root/bk.sh` (tmux `bk`)
+- what failed: all 9 whole-brain state-readout Return jobs that ran (k = 8, sparse wirings) stopped with
+  `AssertionError: dposv info 15993` in `wm2cx.probes.ridge_weights` (dual form, 54,000 fit samples). The same pivot
+  for every wiring and seed. The policy-readout jobs and the baselines were not affected (21 JSONs written).
+- diagnosis: not the data and not the GPU. The float64 Gram accumulation on the GPU matches direct dot products to
+  1e-11 at n = 54,000 and 58,800 (`/root/gram_check.py`). A synthetic positive-definite matrix of the same size fails in
+  scipy's OpenBLAS (0.3.31.dev) `dposv` with the identical `info 15993` under `OMP_NUM_THREADS=4` and solves with the
+  default 32 threads (`logs/chol_check_2026-11-12.log`). `run_blackout.sh` exports `OMP_NUM_THREADS=4`; last night's
+  homing queue (`/root/hom2.sh`) did not set it, which is why the 24-step homing runs were solved correctly.
+- fix: launcher only. `/root/bk.sh` now exports `OPENBLAS_NUM_THREADS=32`, which OpenBLAS reads ahead of
+  `OMP_NUM_THREADS`. No evaluation setting changed; the failed jobs had written no JSON and are rerun by the skip rule.
+  Stage stopped and relaunched 08:22 UTC (box clock). Failure logs kept in `logs/bk_failed_dposv_2026-11-12/` (box).
+- still open: `run_l4_full.sh` exports `OPENBLAS_NUM_THREADS=$OMP` (default 4), so the same failure would hit any
+  whole-brain dual solve launched through it at these sizes; the solver call needs a thread-independent path or a
+  residual check before the next whole-brain evaluation is launched that way. Sizes 56,400 to 63,600 (k = 16 to 40)
+  are untested with 32 threads; the `info` assertion stops a job that fails.
