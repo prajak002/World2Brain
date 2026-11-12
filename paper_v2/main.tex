@@ -768,20 +768,23 @@ student.
   \caption{\textbf{The whole brain} (139,248 neurons, 2,700,429 signed edges; every model within 2\,\% of 41.3\,M
   parameters; arena, mean\pm sd over 3 seeds). $\Delta$: paired difference in blind MSE to the connectome over 400
   shared test episodes with a 95\,\% bootstrap interval; every $\Delta$ has Holm-corrected $p<0.001$. Heading and
-  position are read by the ridge probe from all units during the dark window.}
+  position are read by the ridge probe from all units during the dark window. Homing: the agent walks back through 24
+  dark steps on a ridge readout of its own state, starting 3.89 units from home; \emph{dist} is where it ends and
+  \emph{drift} the error of its decoded position when the dark ends (50 episodes per seed). $^{\ast}$Not different
+  from the connectome (paired bootstrap interval contains zero); every other homing entry differs at Holm $p<0.05$.}
   \label{tab:scale}
-  \setlength{\tabcolsep}{5pt}\begin{tabular}{lccccc}
+  \setlength{\tabcolsep}{3.5pt}\begin{tabular}{lccccccc}
     \toprule
-    & \multicolumn{2}{c}{Blind latent prediction} & \multicolumn{3}{c}{Path integration read from the state} \\
-    \cmidrule(lr){2-3}\cmidrule(lr){4-6}
-    whole-brain wiring & MSE $\downarrow$ & $\Delta$ to connectome & heading err, 8 dark steps $\downarrow$ & heading err, 16 dark steps $\downarrow$ & pos $R^2$ $\uparrow$ \\
+    & \multicolumn{2}{c}{Blind latent prediction} & \multicolumn{3}{c}{Path integration read from the state} & \multicolumn{2}{c}{Homing, 24 dark steps} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-6}\cmidrule(lr){7-8}
+    whole-brain wiring & MSE $\downarrow$ & $\Delta$ to connectome & heading, 8 dark $\downarrow$ & heading, 16 dark $\downarrow$ & pos $R^2$ $\uparrow$ & dist $\downarrow$ & drift $\downarrow$ \\
     \midrule
-    GRU, parameter-matched & \textbf{0.416\pm0.004} & $-0.207$ [$-0.226$, $-0.189$] & 33.1\pm1.2 & 39.7\pm0.7 & 0.31\pm0.02 \\
-    Transformer, parameter-matched & 0.671\pm0.040 & $+0.047$ [$+0.037$, $+0.058$] & 41.7\pm1.2 & 55.4\pm1.4 & 0.26\pm0.04 \\
-    \textbf{connectome} & 0.624\pm0.005 & reference & \textbf{11.1\pm1.8} & \textbf{20.4\pm2.4} & \textbf{0.92\pm0.00} \\
-    random & 0.680\pm0.002 & $+0.056$ [$+0.049$, $+0.064$] & 14.3\pm0.5 & 27.7\pm0.2 & 0.91\pm0.00 \\
-    block-shuffled & 0.693\pm0.004 & $+0.069$ [$+0.061$, $+0.077$] & 14.1\pm0.9 & 27.2\pm1.1 & 0.91\pm0.01 \\
-    degree-shuffled & 0.703\pm0.005 & $+0.079$ [$+0.070$, $+0.088$] & 14.6\pm0.4 & 28.4\pm0.5 & 0.91\pm0.00 \\
+    GRU, matched & \textbf{0.416\pm0.004} & $-0.207$ [$-0.226$, $-0.189$] & 33.1\pm1.2 & 39.7\pm0.7 & 0.31\pm0.02 & 3.47\pm0.25 & 3.58\pm0.20 \\
+    Transformer, matched & 0.671\pm0.040 & $+0.047$ [$+0.037$, $+0.058$] & 41.7\pm1.2 & 55.4\pm1.4 & 0.26\pm0.04 & 4.48\pm0.16 & 4.31\pm0.09 \\
+    \textbf{connectome} & 0.624\pm0.005 & reference & \textbf{11.1\pm1.8} & \textbf{20.4\pm2.4} & \textbf{0.92\pm0.00} & 2.27\pm0.06 & \textbf{2.75\pm0.16} \\
+    random & 0.680\pm0.002 & $+0.056$ [$+0.049$, $+0.064$] & 14.3\pm0.5 & 27.7\pm0.2 & 0.91\pm0.00 & 2.26\pm0.12$^{\ast}$ & 3.12\pm0.14 \\
+    block-shuffled & 0.693\pm0.004 & $+0.069$ [$+0.061$, $+0.077$] & 14.1\pm0.9 & 27.2\pm1.1 & 0.91\pm0.01 & 2.09\pm0.04$^{\ast}$ & 3.95\pm0.31 \\
+    degree-shuffled & 0.703\pm0.005 & $+0.079$ [$+0.070$, $+0.088$] & 14.6\pm0.4 & 28.4\pm0.5 & 0.91\pm0.00 & 2.24\pm0.07$^{\ast}$ & 4.43\pm0.12 \\
     \bottomrule
   \end{tabular}
 \end{table*}
@@ -798,10 +801,15 @@ give the same ordering. Two cautions. A random
 3,302-neuron subset of the connectome, matched to the GRU's width, still beats the GRU (27.0\degree\ against
 33.1\degree) but is no longer ahead of the rewired brains' subsets (20.7 to 24.9\degree): the whole-brain code is
 concentrated, with the 2,875 central-complex neurons alone giving 10.3\degree\ in seed 0, where the actions enter. And
-the MLP probe does not fit at 139,248 inputs, so only the ridge probe is reported at this scale. Whole-brain homing,
-and a registered evaluation on Memory Maze~\cite{pasukonis2023memmaze} under its published offline-probing protocol
-with \emph{in-silico lesions} of the central complex and mushroom body, were unfinished at submission; we make no claim
-from them.
+the MLP probe does not fit at 139,248 inputs, so only the ridge probe is reported at this scale. \emph{Behaviour:} steering home through 24 dark steps on a ridge
+readout of its own state, every sparse whole brain roughly halves its distance to the start (3.89 to between 2.09 and
+2.27), where the GRU ends at 3.47 and the transformer, at 4.48, ends further away than it began. The connectome's
+decoded position drifts least (2.75 against 3.12 to 4.43 for the rewired brains and 3.58 for the GRU; every paired
+difference significant), but that does not shorten its walk: its final distance is not different from any rewired
+brain's, and success within one unit stays low for all (0.07 to 0.19). As on the circuit, homing separates sparse
+signed recurrence from free recurrence, not real wiring from rewired. A registered evaluation on Memory
+Maze~\cite{pasukonis2023memmaze} under its published offline-probing protocol, with \emph{in-silico lesions} of the
+central complex and mushroom body, was unfinished at submission; we make no claim from it.
 
 \subsection{What is outperformed, and what is not}
 \label{sec:scorecard}
@@ -859,8 +867,8 @@ fly's version is a little better'' is the paper. A mechanistic hypothesis is giv
 (i) Blind return with the policy head uses two connectome seeds and one seed for the GRU, dense and NYC rows; shuffled
 wirings and the transformer are pre-registered but not yet run under this readout. (ii) Actions are given to the student in the dark.
 (iii) The environments are synthetic, and on real video no student beats copy-last zero-shot. (iv) The teacher is
-ViT-B at 256\,px and the NYC twin is one location. (v) The LSTM, graph-network, structured-loss and whole-brain rows use 3 seeds; whole-brain homing and Memory Maze
-(\cref{sec:scale}) are registered but unfinished. (vi) The EPG population does not carry the heading code; the
+ViT-B at 256\,px and the NYC twin is one location. (v) The LSTM, graph-network, structured-loss and whole-brain rows use 3 seeds; Memory Maze
+(\cref{sec:scale}) is registered but unfinished. (vi) The EPG population does not carry the heading code; the
 biological ring attractor does not emerge at this scale and we do not claim it.
 
 \section{Conclusion}
