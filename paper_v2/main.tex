@@ -729,8 +729,6 @@ recurrence, the best predictor among the state-matched networks, collapses to ch
 steps. On the NYC twin with 30 dark steps, where a step is 3\,m and the start lies 30\,m away, the connectome returns
 in \nBkConnNycTh\ of episodes and the GRU in \nBkGruNycTh. The ordering reverses the prediction benchmark: the worst
 predictor of the three (\cref{tab:pred}) holds the state that is most useful for acting in the dark.
-Block-shuffled and transformer rows, three seeds per row and the $k=40$ NYC point are pre-registered in the released
-benchmark specification and not yet run.
 
 \subsection{Benchmark 4: real handheld video}
 \label{sec:realvid}
@@ -842,26 +840,15 @@ and Walls stays at the constant predictor. We make no memory claim from it, and 
 \end{table}
 \Cref{tab:score} condenses the paper. The connectome beats every \emph{wiring} control on prediction and on the dark
 heading code. It loses prediction to every \emph{free} recurrence, wins the dark heading code against all of them, and
-with a policy head turns that code into blind return that neither the GRU nor the dense network matches.
+on the circuit a policy head turns that code into blind return that neither the GRU nor the dense network matches.
 
 % ================= sec/5_discussion.tex =================
 \section{Discussion}
 \label{sec:novelty}
-\paragraph{What is new}
-(i) A student class for world-model distillation whose recurrence is a fixed, signed, synapse-level wiring diagram and
-whose target is a self-supervised video model, not a task loss or recordings (\supp{tab:prior}). (ii) A control ladder
-that separates density, degree sequence, macro-architecture and synapse identity, with identity worth about 1\,\% of
-latent error and \nConnBlockGapArena\ to \nConnBlockGapArenaDarkSixteen\degree\ of heading (\cref{tab:pred} and \cref{tab:dark} in the supplement). (iii) An emergent path-integration code that
-prediction quality does not explain, surviving 20 dark steps, continuous turns, a non-linear probe, a geographic split
-and transfer to phone video (\cref{tab:probe} and \cref{tab:dark,tab:realvid} in the supplement), and usable for blind return at roughly twice the GRU's
-success rate (\cref{fig:blackout}). (iv) Scaling a connectome model by cloning it through its 40,194 real commissural synapses, which
-shows it is topology-limited, not size-limited (\supp{tab:multi}). (v) Three worlds, ceilings, floors and every
-negative result.
-
 \paragraph{Two claims that are easy to conflate}
 The first is about a \emph{class} of topology: connectome-scale sparse signed recurrence, trained only to predict a
 video model's latent, holds a state that path-integrates, which neither a GRU nor a transformer trained on the same objective at the same
-budget forms, and supports blind return at twice the GRU's rate (the transformer is not yet tested under the policy head). Both predict the latent better, so the code trades
+budget forms, and on the circuit supports blind return at twice the GRU's rate. Both predict the latent better, so the code trades
 against prediction rather than following from it. The second is about the \emph{identity} of the real synapses, and
 here the evidence is modest and consistent: about one percent of latent error and a few degrees of heading, present
 across seeds, worlds, data sizes and subgraphs, but never the cause. ``Sparse signed recurrence integrates, and the
@@ -878,8 +865,8 @@ biological ring attractor does not emerge at this scale and we do not claim it.
 A video foundation model can be distilled into a world model whose recurrence is the fly's wiring diagram. The wiring
 makes it a worse predictor and a better integrator: the state keeps a readable heading and position through the dark
 that neither a GRU nor a transformer trained on the same objective forms, with a small, consistent advantage for the
-real synapses over shuffled ones and no gain from more brains. Read by a policy head, that code becomes behaviour: the
-connectome walks home through 30 dark steps where the GRU succeeds roughly half as often. Closing the gap to the oracle on the full
+real synapses over shuffled ones and no gain from more brains. On the circuit a policy head turns that code into behaviour: the
+connectome walks home through 30 dark steps where the GRU succeeds roughly half as often; at whole-brain size this holds for a linear readout only. Closing the gap to the oracle on the full
 control set is the open problem, and we release everything needed to work on it.
 {\small
 \bibliographystyle{ieeenat_fullname}
