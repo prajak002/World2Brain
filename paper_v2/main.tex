@@ -343,7 +343,7 @@ steps, continuous turn angles and a twin of Manhattan, and with a small policy h
 dark steps in \nBkConnArenaTw--\nBkConnArenaTh\ of episodes against \nBkGruArenaTw--\nBkGruArenaTh\ for the GRU. Real
 wiring beats every rewired control, by about 1\,\% of prediction error on the circuit and by 8 to 11\,\% on the whole
 brain, where it also out-predicts the transformer and holds heading to 11.1\degree\ against 33.1\degree\ for the GRU and
-14.1 to 14.6\degree\ for the rewired brains. Code, environments and checkpoints are released.
+14.1 to 14.6\degree\ for the rewired brains. Code and environments are released.
 \end{abstract}
 % ================= sec/1_intro.tex =================
 \section{Introduction}
@@ -429,7 +429,7 @@ and whose teacher is a self-supervised video model. We summarise the contributio
         homing, goal navigation and real phone video are reported in full, negative outcomes included
         (\cref{sec:behaviour,sec:realvid}).
   \item \textbf{A released benchmark.} Two simulated worlds, the real-video ingest pipeline, a pre-registered
-        Memory Maze protocol with circuit lesions, all code and checkpoints.
+        Memory Maze protocol with circuit lesions, and all code.
 \end{itemize}
 % ================= sec/2_related.tex =================
 \section{Prior work and where this paper sits}
@@ -1348,6 +1348,6 @@ phone clip with both students fine-tuned on the other clips.
 \subsection{Reproducibility}
 All results in the paper come from one run on a single RTX 4090 (about 14 GPU-hours): 5 seeds on the arena, 3 on NYC,
 12 wirings, 424 checkpoints; the second batch (\cref{tab:newbase}; LSTM, graph network, structured losses, 3 seeds)
-ran on a free cloud GPU on regenerated arena data and carries its own anchor rows. Code, environments, the ingest pipeline for phone video, and the checkpoints are released;
+ran on a free cloud GPU on regenerated arena data and carries its own anchor rows. Code, environments, the ingest pipeline for phone video, and the circuit-scale checkpoints are released (the whole-brain and Memory Maze checkpoints were not kept);
 the \flywire-derived connectome file is rebuilt by one script from the public v783 release.
 \end{document}
