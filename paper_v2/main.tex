@@ -807,9 +807,13 @@ readout of its own state, every sparse whole brain roughly halves its distance t
 decoded position drifts least (2.75 against 3.12 to 4.43 for the rewired brains and 3.58 for the GRU; every paired
 difference significant), but that does not shorten its walk: its final distance is not different from any rewired
 brain's, and success within one unit stays low for all (0.07 to 0.19). As on the circuit, homing separates sparse
-signed recurrence from free recurrence, not real wiring from rewired. A registered evaluation on Memory
-Maze~\cite{pasukonis2023memmaze} under its published offline-probing protocol, with \emph{in-silico lesions} of the
-central complex and mushroom body, was unfinished at submission; we make no claim from it.
+signed recurrence from free recurrence, not real wiring from rewired. \emph{Blind return} at this size (ridge readout, 3 seeds): the connectome is home in 0.70, 0.50, 0.48 and 0.39 of
+episodes after 16, 24, 30 and 40 dark steps, ahead of the rewired brains at 16, 30 and 40 (by 0.09 to 0.13; Holm
+$p\le0.01$) and of the GRU ($\le0.14$) throughout; the cloned policy head, however, ignores the state of the sparse
+whole brains, and with it the GRU reaches 0.48 to 0.54. \emph{Memory Maze}~\cite{pasukonis2023memmaze}, pre-registered
+under its published probing protocol, is a negative: on 9$\times$9 Objects the connectome (MSE 20.1) beats its
+rewirings (22.3 to 22.5) but not the GRU (12.7), no student beats a probe on the teacher's frame features alone (12.7),
+and Walls stays at the constant predictor. We make no memory claim from it, and the registered lesion test is void.
 
 \subsection{What is outperformed, and what is not}
 \label{sec:scorecard}
@@ -867,8 +871,7 @@ fly's version is a little better'' is the paper. A mechanistic hypothesis is giv
 (i) Blind return with the policy head uses two connectome seeds and one seed for the GRU, dense and NYC rows; shuffled
 wirings and the transformer are pre-registered but not yet run under this readout. (ii) Actions are given to the student in the dark.
 (iii) The environments are synthetic, and on real video no student beats copy-last zero-shot. (iv) The teacher is
-ViT-B at 256\,px and the NYC twin is one location. (v) The LSTM, graph-network, structured-loss and whole-brain rows use 3 seeds; Memory Maze
-(\cref{sec:scale}) is registered but unfinished. (vi) The EPG population does not carry the heading code; the
+ViT-B at 256\,px and the NYC twin is one location. (v) The LSTM, graph-network, structured-loss and whole-brain rows use 3 seeds. (vi) The EPG population does not carry the heading code; the
 biological ring attractor does not emerge at this scale and we do not claim it.
 
 \section{Conclusion}
