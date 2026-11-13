@@ -195,3 +195,38 @@ the negative against the rewired brains; body is 8 pages.
   whole-brain dual solve launched through it at these sizes; the solver call needs a thread-independent path or a
   residual check before the next whole-brain evaluation is launched that way. Sizes 56,400 to 63,600 (k = 16 to 40)
   are untested with 32 threads; the `info` assertion stops a job that fails.
+
+## 2026-11-13 batch-A-blackout — whole-brain Blackout stage complete (T1 Return, T3 Re-entry; in-house, secondary)
+
+- commit: evaluation code 7a625a7 (unchanged); statistics `scripts/full_brain_blackout_stats.py` (this commit)
+  box: Vast 60172952, GPU 1          wall time: 2026-11-12 08:22 - 16:59 UTC (after the relaunch logged above)
+- command: `/root/bk.sh` (tmux `bk`; `run_blackout.sh` with `SFX=_full ENVS=arena TASKS="t1 t3"`, `OPENBLAS_NUM_THREADS=32`),
+  then `PYTHONPATH=. python scripts/full_brain_blackout_stats.py` on the laptop. 213 of 213 jobs wrote a JSON; no
+  `dposv` failure after the relaunch, including the untested sizes k = 16 to 40.
+- statistics: 3 seeds x 6 wirings, 100 shared episodes (Return) / 200 test episodes (Re-entry), paired bootstrap over
+  episodes with seeds averaged per episode, 10,000 resamples, Holm over the 5 comparisons of each metric, readout and k.
+  Not a registered hypothesis family (H6 names only the heading comparison); reported as the secondary benchmark.
+  * **Return, state readout, success** at k = 8 / 16 / 24 / 30 / 40: connectome 0.26 / 0.70 / 0.50 / 0.48 / 0.39;
+    degree-shuffled 0.25 / 0.60 / 0.47 / 0.37 / 0.27; block-shuffled 0.27 / 0.59 / 0.46 / 0.35 / 0.28; random
+    0.24 / 0.58 / 0.46 / 0.39 / 0.26; GRU 0.02 / 0.14 / 0.07 / 0.07 / 0.09; transformer 0.12 / 0.28 / 0.04 / 0.04 / 0.02.
+    Ceiling (oracle pose) 0.24 / 0.94 / 1.00 / 1.00 / 1.00; dead reckoning of actions 0.26 / 0.83 / 0.91 / 0.91 / 0.91.
+    Connectome against the three rewired brains: higher at k = 16, 30, 40 (differences 0.09 to 0.13, Holm p <= 0.01);
+    "no difference" at k = 8 and k = 24. Against GRU and transformer: higher at every k (Holm p = 0.0005).
+  * **Return, state readout, final distance**: connectome lower than every rewired brain at k >= 16 (0.21 to 0.77 units,
+    Holm p <= 0.03), "no difference" at k = 8; lower than GRU and transformer at every k.
+  * **Return, policy readout: NOT INFORMATIVE for the sparse whole-brain students.** The connectome runs give the
+    identical result for all 3 seeds and for k = 8, 16, 24 (success 0.14, final distance 2.794), and the rewired brains
+    mostly the same numbers: the fitted policy head emits the same actions whatever the state. The GRU with the policy
+    readout reaches 0.25 / 0.54 / 0.50 / 0.51 / 0.48, i.e. at k >= 24 as good as or better than the connectome's state
+    readout (0.50 / 0.48 / 0.39). So "the connectome beats the GRU on Return" holds for the state readout only; taking
+    each model's better readout there is no connectome advantage over the GRU at k >= 24. This goes into the paper as is.
+  * **Re-entry, blind latent MSE over 8 dark steps**: GRU 0.482 < connectome 0.771 < transformer 0.827 < random 0.840
+    < block-shuffled 0.860 < degree-shuffled 0.867 < copy-last 1.032 < constant 1.301. Every difference to the connectome
+    has a CI excluding 0 (Holm p = 0.0007). Same order as the whole-brain prediction result: real wiring beats rewired
+    wiring and the transformer, and loses to the GRU.
+- outputs: `results/homing/*_full_tn_arena_{state,policy}_k*_tn.json` (180) and the oracle / actions / random rows (15),
+  `results/runs/*_full_tn_reentry.json` (18), `results/baselines/*_reentry.json`,
+  `results/full_brain_blackout_summary.{md,json}`          logs: `logs/h200_full_blackout.log`, box `logs/bk_*.log`
+- failures / deviations: T2 (goal navigation) and the NYC world NOT RUN at whole-brain size (reasons in the entry of
+  2026-11-12). The policy-readout degeneracy above is not investigated further; no setting was changed and nothing rerun.
+  `results/blackout_table.md` (circuit scale) is untouched.
