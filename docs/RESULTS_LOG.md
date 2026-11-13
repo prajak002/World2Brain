@@ -230,3 +230,49 @@ the negative against the rewired brains; body is 8 pages.
 - failures / deviations: T2 (goal navigation) and the NYC world NOT RUN at whole-brain size (reasons in the entry of
   2026-11-12). The policy-readout degeneracy above is not investigated further; no setting was changed and nothing rerun.
   `results/blackout_table.md` (circuit scale) is untouched.
+
+## 2026-11-13 memmaze B4-B6 — Memory Maze 9x9 complete: training (22 runs), probes, lesions, statistics. H1 FAIL, H4 FAIL
+
+- commit: code on the box 95c8aa0 (`train_mm.py`, `eval_mm_probe.py`, `eval_mm_lesion.py`, `mm_stats.py`,
+  `mm_lesion_stats.py`); PREREG sections 2-5 with Amendments 1, 2, 4          box: Vast 60172952, both GPUs
+- wall time: training 2026-11-11 18:21 - 2026-11-13 10:30 UTC (C / S / B / R 7.2-12.0 h per run, G 0.2-0.3 h, T 0.1 h);
+  probes 2026-11-12 15:45 - 2026-11-13 11:05; lesions 2026-11-12 19:35 - 2026-11-13 11:44; statistics 11:16 and 11:45.
+- command: `JOBS=.. scripts/run_mm_b4.sh` (tmux `mm0`, `mm1`, `mm1b`), `/root/mm_probe.sh`, `/root/mm_lesion.sh`,
+  `PYTHONPATH=. python scripts/mm_stats.py`, `PYTHONPATH=. python scripts/mm_lesion_stats.py`
+- runs: C 5, G 5, S 3, B 3, R 3, T 3 seeds, all 12,000 updates, checkpoint chosen on validation (u 12,000 for every run).
+  Parameters: C / S / B / R 41,393,175 (recurrent 2,700,429, input 2,627,258, output 35,647,744), G 41,386,644,
+  T 41,543,424 (within 0.4 %). Published constant baseline reproduced by K: 80.79 % / 24.01 (published 80.8 / 23.9).
+- result (1,000 eval trajectories, steps 500-1000; mean +- sd over seeds), `results/memmaze/summary.md`:
+
+  | condition | seeds | 9x9 Walls acc % | 9x9 Objects MSE |
+  |---|---|---|---|
+  | C connectome | 5 | 80.7 +- 0.1 | 20.13 +- 0.30 |
+  | S degree-shuffled | 3 | 80.7 +- 0.1 | 22.35 +- 0.02 |
+  | B block-shuffled | 3 | 80.7 +- 0.1 | 22.49 +- 0.02 |
+  | R random | 3 | 80.7 +- 0.1 | 22.33 +- 0.09 |
+  | G GRU | 5 | 80.6 +- 0.2 | 12.66 +- 0.11 |
+  | T transformer | 3 | 80.9 +- 0.1 | 12.55 +- 0.09 |
+  | N teacher frame features, no memory | 3 | 80.8 +- 0.1 | 12.74 +- 0.07 |
+  | K constant | 1 | 80.8 | 24.01 |
+
+- prereg items (paired bootstrap, 10,000 resamples, Holm over {H1, H2a, H2b, H3, H4a, H4b}; diff > 0 = C better):
+  * **H1 (primary), Objects C < G: FAIL.** -7.47 [-7.79, -7.17]: the GRU is better.
+  * **H2, Objects C < S and C < B: PASS.** +2.22 [1.94, 2.49] and +2.37 [2.08, 2.64], Holm p = 0.0000. Not interpretable
+    as memory (H4), and all four sparse students are worse than the frame features.
+  * **H3, Walls C > G: INCONCLUSIVE.** +0.11 [-0.04, 0.28]. Every condition is at the constant predictor (80.8 %).
+  * **H4, C beats N on both tasks: FAIL.** Objects -7.39 [-7.70, -7.10]; Walls -0.09 [-0.22, 0.07]. By section 4,
+    **no memory claim is made for any condition.** G (12.66) and T (12.55) are within 0.2 of N (12.74) as well: no
+    student added memory beyond the teacher's frame features at this budget.
+  * **H5 (descriptive):** C 20.13 against published RSSM (TBTT) 6.2: not below. Best of ours (T, 12.55) is between
+    the published VAE without memory (17.2) and RSSM (8.3).
+  * **H7 (lesions, Amendment 2): VOID**, because H4 failed (precondition 6). Reported descriptively
+    (`results/memmaze/lesion_summary.md`): in C a CX lesion removes 0.60 [0.53, 0.67] of the above-constant Objects
+    performance against 0.14 for matched random lesions (H7a estimate 0.455, H7b 0.491, both would pass), but
+    H7c FAILS (-0.444 [-0.552, -0.338]: the CX-specific effect is larger in the degree-shuffled student, 0.90, than in C),
+    and the CXdeaf deficit (0.73) is as large as the CX lesion deficit, so by precondition 6 the effect is attributed to
+    lost action input, not to the circuit. Negative; no double dissociation, no wiring-specific lesion claim.
+- outputs: `results/memmaze/runs/*.json` (22 registered + 4 side-condition + 8 lr-selection runs),
+  `results/memmaze/probe/*.json` (26), `results/memmaze/lesion/*.json` (11), `results/memmaze/summary.{md,json}`,
+  `results/memmaze/lesion_summary.{md,json}`          logs: `logs/mm_stats.log`, `logs/mm_lesion_stats.log`, box `logs/b4_*.log`
+- failures / deviations: none in these stages. The side conditions (`C_s0_lr2e-4`, `G_s{0,1,2}_lr4e-3`) were trained but
+  not probed; they are reported with their losses only (Amendment 4). Checkpoints and probe weights are on the box only.
